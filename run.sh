@@ -1,5 +1,5 @@
 #!/bin/bash
-# Stock Trading Simulator - Startup Script
+# StockArena - One-click startup script
 # Usage: ./run.sh
 
 set -e
@@ -8,18 +8,29 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR"
 
 echo "=========================================="
-echo "  Stock Trading Simulator"
+echo "  StockArena - Multi-Stock Trading Simulator"
 echo "=========================================="
 
+# Auto-create virtual environment if needed
+if [ ! -d "ml_trading_env" ]; then
+    echo "[*] Creating Python virtual environment..."
+    python3 -m venv ml_trading_env
+    echo "[OK] Virtual environment created"
+fi
+
 # Activate virtual environment
-if [ -d "ml_trading_env" ]; then
-    source ml_trading_env/bin/activate
-    echo "[OK] Python virtual environment activated"
-else
-    echo "[!] Virtual environment ml_trading_env/ not found"
-    echo "    Please run: python3 -m venv ml_trading_env"
-    echo "    Then: source ml_trading_env/bin/activate && pip install -r requirements_ml.txt"
-    exit 1
+source ml_trading_env/bin/activate
+echo "[OK] Python virtual environment activated"
+
+# Install dependencies (only if requirements file exists and deps not yet installed)
+if [ -f "requirements_ml.txt" ]; then
+    if ! python -c "import flask" 2>/dev/null; then
+        echo "[*] Installing dependencies..."
+        pip install -r requirements_ml.txt -q
+        echo "[OK] Dependencies installed"
+    else
+        echo "[OK] Dependencies already installed"
+    fi
 fi
 
 # Start Python ML backend
@@ -39,11 +50,10 @@ echo "    Frontend service PID: $HTTP_PID"
 
 echo ""
 echo "=========================================="
-echo "  Services started!"
-echo "  Frontend page: http://localhost:8000"
-echo "  ML API:        http://localhost:5001/api/ml/status"
+echo "  StockArena is running!"
+echo "  Open: http://localhost:8000"
 echo "=========================================="
-echo "  Press Ctrl+C to stop all services"
+echo "  Press Ctrl+C to stop"
 echo ""
 
 # Trap exit signal to clean up child processes
@@ -52,7 +62,7 @@ cleanup() {
     echo "[*] Stopping services..."
     kill $ML_PID 2>/dev/null
     kill $HTTP_PID 2>/dev/null
-    echo "[OK] Services stopped"
+    echo "[OK] Stopped"
     exit 0
 }
 trap cleanup SIGINT SIGTERM
