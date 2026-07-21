@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#1a1a2e">
+    <title>股票买卖练习</title>
+    <!-- Tailwind CSS v3 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js"></script>
+    <!-- Tailwind 配置 -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#1a56db',
+                        secondary: '#e2e8f0',
+                        success: '#10b981',
+                        danger: '#ef4444',
+                        warning: '#f59e0b',
+                        info: '#3b82f6',
+                        light: '#f8fafc',
+                        dark: '#1e293b'
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                    animation: {
+                        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                    }
+                }
+            }
+        }
+    </script>
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .glass-effect {
+                background: rgba(255, 255, 255, 0.2);
+                backdrop-filter: blur(8px);
+                -webkit-backdrop-filter: blur(8px);
+                border: 1px solid rgba(255, 255, 255, 0.18);
+            }
+            .text-shadow {
+                text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            }
+            .transition-all-300 {
+                transition: all 300ms ease-in-out;
+            }
+        }
+    </style>
+    
+</head>
+<body class="bg-gradient-to-br from-gray-100 to-gray-200 min-h-screen">
+    <div class="container mx-auto px-4 py-6 max-w-[1600px]">
+        <!-- 标题区域 -->
+        <header class="text-center mb-6">
+            <h1 class="text-3xl font-bold text-primary mb-1 text-shadow">多股票智能交易练习</h1>
+            <p class="text-gray-600 text-sm">6 只不同特征的股票 · 规则 AI / 学习 AI 可组合持有多只股票</p>
+        </header>
+
+        <!-- 股票选择卡片 -->
+        <div class="bg-gradient-to-br from-indigo-50 to-blue-50 rounded-xl shadow-lg p-4 mb-4 border border-blue-200">
+            <div class="flex items-center mb-2">
+                <i class="fa fa-list mr-2 text-primary"></i>
+                <h3 class="text-sm font-semibold text-gray-800">股票池（点击切换）</h3>
+                <span class="ml-2 text-xs text-gray-500" id="currentStockName">-</span>
+            </div>
+            <div id="stockCards" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
+                <!-- JS 动态生成 -->
+            </div>
+            <p id="currentStockSector" class="mt-2 text-xs text-gray-600"></p>
+        </div>
+
+        <!-- 主内容区域 -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- 左侧：控制面板 -->
+            <div class="lg:col-span-1">
+                <div class="sticky top-6 space-y-4">
+                    <!-- 交易操作 -->
+                    <div class="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl shadow-lg p-5 border border-blue-200">
+                        <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                            <i class="fa fa-exchange mr-2 text-blue-600"></i>交易操作
+                        </h3>
+                        
+                        <!-- 当前价格 -->
+                        <div class="mb-4 bg-white rounded-lg p-3">
+                            <div class="flex justify-between items-center mb-1">
+                                <span class="text-gray-600 text-sm">当前价格:</span>
+                                <span id="currentPriceDisplay" class="font-bold text-xl text-gray-900">¥1.00</span>
+                            </div>
+                            <div class="flex items-center">
+                                <span id="priceChangeDisplay" class="text-sm font-medium">0.00 (0.00%)</span>
+                                <div id="priceIndicator" class="ml-2 w-2 h-2 rounded-full bg-success"></div>
+                            </div>
+                        </div>
+                        
+                        <!-- 买入表单 -->
+                        <div class="mb-3">
+                            <label class="block text-gray-700 text-xs font-medium mb-2">买入股数:</label>
+                            <div class="grid grid-cols-3 gap-2 mb-2">
+                                <button class="buy-shares-btn bg-white hover:bg-blue-50 text-gray-800 py-2 px-2 rounded-lg text-xs font-medium border border-gray-200 transition-all" data-shares="10">10股</button>
+                                <button class="buy-shares-btn bg-white hover:bg-blue-50 text-gray-800 py-2 px-2 rounded-lg text-xs font-medium border border-gray-200 transition-all" data-shares="20">20股</button>
+                                <button class="buy-shares-btn bg-white hover:bg-blue-50 text-gray-800 py-2 px-2 rounded-lg text-xs font-medium border border-gray-200 transition-all" data-shares="30">30股</button>
+                                <button class="buy-shares-btn bg-white hover:bg-blue-50 text-gray-800 py-2 px-2 rounded-lg text-xs font-medium border border-gray-200 transition-all" data-shares="40">40股</button>
+                                <button class="buy-shares-btn bg-white hover:bg-blue-50 text-gray-800 py-2 px-2 rounded-lg text-xs font-medium border border-gray-200 transition-all" data-shares="50">50股</button>
+                            </div>
+                            <p id="buyMessage" class="mt-1 text-xs text-gray-500"></p>
+                        </div>
+                        
+                        <!-- 卖出表单 -->
+                        <div>
+                            <label for="sellShares" class="block text-gray-700 text-xs font-medium mb-2">卖出股数:</label>
+                            <div class="flex gap-2">
+                                <input type="number" id="sellShares" min="1" class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="输入股数">
+                                <button id="sellBtn" class="bg-danger hover:bg-red-600 text-white font-medium py-2 px-4 rounded-lg transition-all-300 disabled:opacity-50 disabled:cursor-not-allowed text-sm">
+                                    卖出
+                                </button>
+                            </div>
+                            <p id="sellMessage" class="mt-1 text-xs text-gray-500"></p>
+                        </div>
+                    </div>
+                    
+                    <!-- 开始按钮 -->
+                    <button id="startBtn" class="w-full bg-primary hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-xl shadow-lg transition-all-300 flex items-center justify-center text-lg">
+                        <i class="fa fa-play-circle mr-2"></i>开始训练
+                    </button>
+                    
+                    <!-- 机器交易开关 -->
+                    <div class="bg-white rounded-xl shadow-lg p-4">
+                        <div class="flex justify-between items-center">
+                            <div>
+                                <h3 class="text-sm font-medium text-gray-700">机器交易</h3>
+                                <p class="text-xs text-gray-500 mt-1">组合风控与技术指标自动交易</p>
+                            </div>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" id="machineTradingToggle" class="sr-only peer">
+                                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <!-- ML 机器人控制面板 -->
+                    <div class="bg-white rounded-xl shadow-lg p-4">
+                        <div class="flex justify-between items-center mb-3">
+                            <div>
+                                <h3 class="text-sm font-semibold text-gray-800 flex items-center">
+                                    <i class="fa fa-robot mr-2 text-purple-600"></i>学习AI控制
+                                </h3>
+                            </div>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" id="mlRobotToggle" class="sr-only peer">
+                                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
+                            </label>
+                        </div>
+                        
+                        <div class="space-y-3">
+                            <!-- 学习率滑块 -->
+                            <div class="bg-gray-50 rounded-lg p-3">
+                                <div class="flex justify-between items-center mb-1">
+                                    <label class="text-xs text-gray-600">学习率</label>
+                                    <span id="learningRateDisplay" class="text-xs font-medium text-purple-600">0.10</span>
+                                </div>
+                                <input type="range" id="learningRateSlider" min="0.01" max="1" step="0.01" value="0.1" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                            </div>
+                            
+                            <!-- 探索率滑块 -->
+                            <div class="bg-gray-50 rounded-lg p-3">
+                                <div class="flex justify-between items-center mb-1">
+                                    <label class="text-xs text-gray-600">探索率</label>
+                                    <span id="explorationRateDisplay" class="text-xs font-medium text-purple-600">0.30</span>
+                                </div>
+                                <input type="range" id="explorationRateSlider" min="0" max="1" step="0.01" value="0.3" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                            </div>
+                            
+                            <!-- 训练数据量选择 -->
+                            <div class="bg-gray-50 rounded-lg p-3">
+                                <label class="text-xs text-gray-600 block mb-1">训练数据量</label>
+                                <select id="trainingDataSize" class="w-full text-xs border border-gray-300 rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-purple-500">
+                                    <option value="1000">1000 条</option>
+                                    <option value="3000" selected>3000 条</option>
+                                    <option value="5000">5000 条</option>
+                                    <option value="10000">10000 条</option>
+                                </select>
+                            </div>
+                            
+                            <!-- 预训练按钮 -->
+                            <button id="pretrainMLModelBtn" class="w-full bg-purple-600 hover:bg-purple-700 text-white text-xs font-medium py-2 px-3 rounded-lg transition-all-300 flex items-center justify-center">
+                                <i class="fa fa-brain mr-1.5"></i>预训练模型
+                            </button>
+                            
+                            <!-- 预训练进度容器 -->
+                            <div id="pretrainProgressContainer" class="hidden bg-gray-50 rounded-lg p-3">
+                                <div class="flex justify-between items-center mb-1">
+                                    <span id="pretrainStatus" class="text-xs text-gray-600">准备中...</span>
+                                    <span id="pretrainProgressPercent" class="text-xs font-medium text-purple-600">0%</span>
+                                </div>
+                                <div class="w-full bg-gray-200 rounded-full h-2 mb-2">
+                                    <div id="pretrainProgressBar" class="bg-purple-600 h-2 rounded-full transition-all-300" style="width: 0%"></div>
+                                </div>
+                                <div class="flex justify-between items-center text-xs text-gray-500">
+                                    <span>准确率: <span id="pretrainAccuracy" class="font-medium text-purple-600">0.00%</span></span>
+                                    <span>Q表大小: <span id="pretrainQTableSize" class="font-medium text-purple-600">0</span></span>
+                                </div>
+                                <button id="cancelPretrainBtn" class="w-full mt-2 bg-gray-300 hover:bg-gray-400 text-gray-700 text-xs font-medium py-1.5 px-3 rounded-lg transition-all-300">
+                                    取消训练
+                                </button>
+                            </div>
+                            
+                            <!-- 重置模型按钮 -->
+                            <button id="resetMLModelBtn" class="w-full bg-gray-200 hover:bg-gray-300 text-gray-700 text-xs font-medium py-2 px-3 rounded-lg transition-all-300 flex items-center justify-center">
+                                <i class="fa fa-refresh mr-1.5"></i>重置模型
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- 资产信息 - 整合版 -->
+                    <div class="bg-white rounded-xl shadow-lg p-4">
+                        <h3 class="text-sm font-semibold text-gray-800 mb-3 flex items-center">
+                            <i class="fa fa-pie-chart mr-2 text-primary"></i>资产概况（当前股票）
+                        </h3>
+                        
+                        <!-- 用户资产详情 -->
+                        <div class="mb-3 p-2 bg-gray-50 rounded-lg">
+                            <div class="flex justify-between items-center mb-1">
+                                <span class="text-gray-600 text-xs font-medium">您的资产（总现金 + 全部持仓）</span>
+                                <span id="totalAssetDisplay" class="font-bold text-base text-primary">¥100.00</span>
+                            </div>
+                            <div class="grid grid-cols-2 gap-1 text-xs text-gray-500">
+                                <div>现金: <span id="cashDisplay" class="text-gray-700">¥100.00</span></div>
+                                <div>本股持股: <span id="currentSharesDisplay" class="text-gray-700">0 股</span></div>
+                                <div>本股成本: <span id="currentCostDisplay" class="text-gray-700">¥0.00</span></div>
+                                <div>本股市值: <span id="currentValueDisplay" class="text-gray-700">¥0.00</span></div>
+                            </div>
+                        </div>
+                        
+                        <!-- 规则AI资产详情 -->
+                        <div class="mb-3 p-2 bg-blue-50 rounded-lg">
+                            <div class="flex justify-between items-center mb-1">
+                                <span class="text-gray-600 text-xs font-medium">规则 AI（总现金 + 全部持仓）</span>
+                                <span id="machineTotalAssetDisplay" class="font-bold text-base text-info">¥100.00</span>
+                            </div>
+                            <div class="grid grid-cols-2 gap-1 text-xs text-gray-500">
+                                <div>现金: <span id="machineCashDisplay" class="text-gray-700">¥100.00</span></div>
+                                <div>本股持股: <span id="machineSharesDisplay" class="text-gray-700">0 股</span></div>
+                                <div>本股成本: <span id="machineCostDisplay" class="text-gray-700">¥0.00</span></div>
+                                <div>本股市值: <span id="machineValueDisplay" class="text-gray-700">¥0.00</span></div>
+                            </div>
+                    </div>
+                        
+                        <!-- 学习AI资产详情 -->
+                        <div class="p-2 bg-purple-50 rounded-lg">
+                            <div class="flex justify-between items-center mb-1">
+                                <span class="text-gray-600 text-xs font-medium">学习 AI（总现金 + 全部持仓）</span>
+                                <span id="mlRobotTotalAssetDisplay" class="font-bold text-base text-purple-600">¥100.00</span>
+                            </div>
+                            <div class="grid grid-cols-2 gap-1 text-xs text-gray-500">
+                                <div>现金: <span id="mlRobotCashDisplay" class="text-gray-700">¥100.00</span></div>
+                                <div>本股持股: <span id="mlRobotSharesDisplay" class="text-gray-700">0 股</span></div>
+                                <div>本股成本: <span id="mlRobotCostDisplay" class="text-gray-700">¥0.00</span></div>
+                                <div>本股市值: <span id="mlRobotValueDisplay" class="text-gray-700">¥0.00</span></div>
+                            </div>
+                    </div>
+                    </div>
+
+                    <!-- 技术指标选择 -->
+                    <div class="bg-white rounded-xl shadow-lg p-4">
+                        <h3 class="text-sm font-semibold text-gray-800 mb-3 flex items-center">
+                            <i class="fa fa-line-chart mr-2 text-primary"></i>技术指标
+                        </h3>
+                        <div class="space-y-2">
+                            <div class="flex items-center">
+                                <input type="checkbox" id="maCheckbox" class="mr-2 h-3.5 w-3.5 text-primary focus:ring-primary border-gray-300 rounded" checked>
+                                <label for="maCheckbox" class="text-gray-700 text-xs">移动平均线 (MA)</label>
+                            </div>
+                            <div class="flex items-center">
+                                <input type="checkbox" id="rsiCheckbox" class="mr-2 h-3.5 w-3.5 text-primary focus:ring-primary border-gray-300 rounded" checked>
+                                <label for="rsiCheckbox" class="text-gray-700 text-xs">相对强弱指数 (RSI)</label>
+                            </div>
+                            <div class="flex items-center">
+                                <input type="checkbox" id="macdCheckbox" class="mr-2 h-3.5 w-3.5 text-primary focus:ring-primary border-gray-300 rounded" checked>
+                                <label for="macdCheckbox" class="text-gray-700 text-xs">MACD</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 中间和右侧：图表和交易记录 -->
+            <div class="lg:col-span-2 space-y-4">
+                <!-- 股票图表 -->
+                <div class="bg-white rounded-xl shadow-lg p-5">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-xl font-semibold text-gray-800 flex items-center">
+                            <i class="fa fa-area-chart mr-2 text-primary"></i>
+                            <span>价格走势 - <span id="chartStockName" class="text-primary">AAPL 科技蓝筹</span></span>
+                        </h2>
+                        <div class="flex space-x-2">
+                            <button id="timeRange5" class="px-3 py-1 text-sm rounded-md bg-primary text-white">5分钟</button>
+                            <button id="timeRange15" class="px-3 py-1 text-sm rounded-md bg-gray-200 hover:bg-gray-300 text-gray-700">15分钟</button>
+                            <button id="timeRange30" class="px-3 py-1 text-sm rounded-md bg-gray-200 hover:bg-gray-300 text-gray-700">30分钟</button>
+                        </div>
+                    </div>
+                    <div class="h-[500px]">
+                        <canvas id="priceChart"></canvas>
+                    </div>
+                </div>
+                
+                <!-- 技术指标图表 -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- RSI图表 -->
+                    <div class="bg-white rounded-xl shadow-lg p-5">
+                        <h3 class="text-base font-medium text-gray-700 mb-2">RSI指标</h3>
+                        <div class="h-[250px]">
+                            <canvas id="rsiChart"></canvas>
+                        </div>
+                    </div>
+                    
+                    <!-- MACD图表 -->
+                    <div class="bg-white rounded-xl shadow-lg p-5">
+                        <h3 class="text-base font-medium text-gray-700 mb-2">MACD指标</h3>
+                        <div class="h-[250px]">
+                            <canvas id="macdChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 多股票总览 -->
+                <div class="bg-white rounded-xl shadow-lg p-5">
+                    <h2 class="text-lg font-semibold text-gray-800 mb-3 flex items-center">
+                        <i class="fa fa-th mr-2 text-primary"></i>多股票实时总览
+                    </h2>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200 text-xs">
+                            <thead>
+                                <tr>
+                                    <th class="px-2 py-2 bg-gray-50 text-left font-medium text-gray-500">股票</th>
+                                    <th class="px-2 py-2 bg-gray-50 text-right font-medium text-gray-500">现价</th>
+                                    <th class="px-2 py-2 bg-gray-50 text-right font-medium text-gray-500">涨跌</th>
+                                    <th class="px-2 py-2 bg-gray-50 text-right font-medium text-gray-500">RSI</th>
+                                    <th class="px-2 py-2 bg-gray-50 text-left font-medium text-gray-500">趋势</th>
+                                    <th class="px-2 py-2 bg-gray-50 text-right font-medium text-gray-500">您持股</th>
+                                    <th class="px-2 py-2 bg-gray-50 text-right font-medium text-gray-500">AI 关注</th>
+                                </tr>
+                            </thead>
+                            <tbody id="multiStockOverview">
+                                <!-- JS 动态生成 -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- 资产变化图表 -->
+                <div class="bg-white rounded-xl shadow-lg p-5">
+                    <h2 class="text-lg font-semibold text-gray-800 mb-3 flex items-center">
+                        <i class="fa fa-pie-chart mr-2 text-primary"></i>资产对比
+                    </h2>
+                    <div class="h-[350px]">
+                        <canvas id="assetChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- 回测信息面板：核心风控与绩效指标 -->
+                <div class="bg-white rounded-xl shadow-lg p-5">
+                    <div class="flex justify-between items-center mb-3">
+                        <h2 class="text-lg font-semibold text-gray-800 flex items-center">
+                            <i class="fa fa-dashboard mr-2 text-primary"></i>回测信息
+                            <span class="ml-2 text-xs text-gray-500" id="backtestSessionDuration">会话 0 分钟</span>
+                        </h2>
+                        <button id="resetBacktestBtn" class="px-3 py-1 text-xs rounded-md bg-gray-200 hover:bg-gray-300 text-gray-700" title="清空回测统计数据，机器人资金/Q表/学习进度保留">
+                            <i class="fa fa-refresh mr-1"></i>重置回测
+                        </button>
+                    </div>
+
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                        <!-- 收益指标 -->
+                        <div class="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-3">
+                            <div class="text-xs text-gray-500 mb-1">总资产</div>
+                            <div id="btTotalAsset" class="text-lg font-bold text-blue-700">¥100.00</div>
+                            <div id="btReturnRate" class="text-xs text-blue-600 mt-0.5">+0.00%</div>
+                        </div>
+                        <div class="bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-3">
+                            <div class="text-xs text-gray-500 mb-1">夏普比率</div>
+                            <div id="btSharpe" class="text-lg font-bold text-green-700">0.00</div>
+                            <div class="text-xs text-green-600 mt-0.5">60 步滚动</div>
+                        </div>
+                        <div class="bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg p-3">
+                            <div class="text-xs text-gray-500 mb-1">决策准确率</div>
+                            <div id="btAccuracy" class="text-lg font-bold text-purple-700">0.0%</div>
+                            <div id="btDecisions" class="text-xs text-purple-600 mt-0.5">0 次决策</div>
+                        </div>
+                        <div class="bg-gradient-to-br from-amber-50 to-amber-100 rounded-lg p-3">
+                            <div class="text-xs text-gray-500 mb-1">总奖励</div>
+                            <div id="btTotalReward" class="text-lg font-bold text-amber-700">0.00</div>
+                            <div id="btAvgReward" class="text-xs text-amber-600 mt-0.5">平均 0.00</div>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        <!-- 交易统计 -->
+                        <div class="bg-gray-50 rounded-lg p-3">
+                            <div class="text-xs text-gray-500 mb-1">胜率</div>
+                            <div id="btWinRate" class="text-base font-semibold text-gray-700">--</div>
+                            <div id="btTradeCount" class="text-xs text-gray-500 mt-0.5">0 笔成交</div>
+                        </div>
+                        <div class="bg-gray-50 rounded-lg p-3">
+                            <div class="text-xs text-gray-500 mb-1">盈亏比</div>
+                            <div id="btProfitFactor" class="text-base font-semibold text-gray-700">--</div>
+                            <div id="btAvgPnL" class="text-xs text-gray-500 mt-0.5">单笔 0.00</div>
+                        </div>
+                        <div class="bg-gray-50 rounded-lg p-3">
+                            <div class="text-xs text-gray-500 mb-1">最大回撤</div>
+                            <div id="btMaxDrawdown" class="text-base font-semibold text-gray-700">0.00%</div>
+                            <div id="btMaxDDAsset" class="text-xs text-gray-500 mt-0.5">峰值 100.00</div>
+                        </div>
+                        <div class="bg-gray-50 rounded-lg p-3">
+                            <div class="text-xs text-gray-500 mb-1">浮动盈亏</div>
+                            <div id="btFloatingPnL" class="text-base font-semibold text-gray-700">¥0.00</div>
+                            <div id="btFees" class="text-xs text-gray-500 mt-0.5">手续费 ¥0.00</div>
+                        </div>
+                    </div>
+
+                    <!-- 基准对比 -->
+                    <div class="mt-4 pt-3 border-t border-gray-200">
+                        <div class="text-xs text-gray-500 mb-2 flex items-center">
+                            <i class="fa fa-balance-scale mr-1"></i>相对基准收益
+                        </div>
+                        <div class="grid grid-cols-3 gap-3 text-sm">
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">学习AI</span>
+                                <span id="btAlphas" class="font-semibold text-purple-600">--</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">规则AI</span>
+                                <span id="btMachine" class="font-semibold text-gray-700">--</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">买入持有</span>
+                                <span id="btBuyHold" class="font-semibold text-gray-700">--</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 机器学习机器人学习进度 -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- 奖励图表 -->
+                    <div class="bg-white rounded-xl shadow-lg p-5">
+                        <h3 class="text-base font-medium text-gray-800 mb-2 flex items-center">
+                            <i class="fa fa-line-chart mr-2 text-purple-600"></i>累计奖励
+                        </h3>
+                        <div class="h-[250px]">
+                            <canvas id="rewardChart"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- 准确率图表 -->
+                    <div class="bg-white rounded-xl shadow-lg p-5">
+                        <h3 class="text-base font-medium text-gray-800 mb-2 flex items-center">
+                            <i class="fa fa-bar-chart mr-2 text-purple-600"></i>决策准确率
+                        </h3>
+                        <div class="h-[250px]">
+                            <canvas id="accuracyChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 夏普比率图表（独立一行，突出核心风控指标） -->
+                <div class="bg-white rounded-xl shadow-lg p-5">
+                    <div class="flex items-center justify-between mb-2">
+                        <h3 class="text-base font-medium text-gray-800 flex items-center">
+                            <i class="fa fa-balance-scale mr-2 text-green-600"></i>滚动夏普比率
+                            <span class="ml-2 text-xs text-gray-500" title="基于最近 60 步资产对数收益（mean/std），越大说明风险调整后收益越高">
+                                <i class="fa fa-question-circle"></i>
+                            </span>
+                        </h3>
+                        <span id="currentSharpeDisplay" class="text-sm font-semibold text-green-600">0.00</span>
+                    </div>
+                    <div class="h-[220px]">
+                        <canvas id="sharpeChart"></canvas>
+                    </div>
+                </div>
+                
+                <!-- 交易记录 -->
+                <div class="bg-white rounded-xl shadow-lg p-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-xl font-semibold text-gray-800 flex items-center">
+                            <i class="fa fa-history mr-2 text-primary"></i>交易记录（所有股票）
+                        </h2>
+                        <div class="flex space-x-2">
+                            <button id="userTransactionsBtn" class="px-3 py-1 text-sm rounded-md bg-primary text-white">您的交易</button>
+                            <button id="machineTransactionsBtn" class="px-3 py-1 text-sm rounded-md bg-gray-200 hover:bg-gray-300 text-gray-700">规则AI</button>
+                            <button id="mlRobotTransactionsBtn" class="px-3 py-1 text-sm rounded-md bg-gray-200 hover:bg-gray-300 text-gray-700">学习AI</button>
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead>
+                                <tr>
+                                    <th class="px-4 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">时间</th>
+                                    <th class="px-4 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">类型</th>
+                                    <th class="px-4 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">股票</th>
+                                    <th class="px-4 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">价格</th>
+                                    <th class="px-4 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">数量</th>
+                                    <th class="px-4 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">金额</th>
+                                </tr>
+                            </thead>
+                            <tbody id="transactionHistory" class="bg-white divide-y divide-gray-200">
+                                <!-- 交易记录将通过JavaScript动态添加 -->
+                                <tr>
+                                    <td colspan="6" class="px-4 py-4 text-center text-gray-500">暂无交易记录</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 交易策略说明 -->
+        <div class="container mx-auto px-4 py-8 max-w-7xl">
+            <div class="bg-white rounded-xl shadow-lg p-6">
+                <h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center">
+                    <i class="fa fa-lightbulb-o mr-2 text-warning"></i>交易策略说明
+                </h2>
+                
+                <!-- 规则机器人策略 -->
+                <div class="mb-8">
+                    <h3 class="text-lg font-medium text-gray-800 mb-3 flex items-center">
+                        <i class="fa fa-cogs mr-2 text-info"></i>规则机器人策略
+                    </h3>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div class="bg-gray-50 p-4 rounded-lg">
+                            <h4 class="font-medium text-gray-800 mb-2">买入策略</h4>
+                            <ul class="list-disc list-inside text-gray-600 text-sm space-y-1">
+                                <li>MA5位于MA20上方</li>
+                                <li>价格站上MA60趋势线</li>
+                                <li>成交量高于60周期均量1.2倍</li>
+                                <li>MACD柱体为正且继续增强</li>
+                                <li>RSI(21)低于85，避免过热追高</li>
+                            </ul>
+                        </div>
+                        <div class="bg-gray-50 p-4 rounded-lg">
+                            <h4 class="font-medium text-gray-800 mb-2">卖出策略</h4>
+                            <ul class="list-disc list-inside text-gray-600 text-sm space-y-1">
+                                <li>买入时设置ATR动态止损</li>
+                                <li>止损价取价格减2倍ATR，且不低于买入价90%</li>
+                                <li>盈利超过15%后启动移动止盈</li>
+                                <li>新高后将止损上移到高点回撤3%</li>
+                            </ul>
+                        </div>
+                        <div class="bg-gray-50 p-4 rounded-lg">
+                            <h4 class="font-medium text-gray-800 mb-2">交易规则</h4>
+                            <ul class="list-disc list-inside text-gray-600 text-sm space-y-1">
+                                <li>满足全部买入条件才开仓</li>
+                                <li>每次最多使用约三分之一现金</li>
+                                <li>持仓期间不重复开仓</li>
+                                <li>止损或移动止盈触发时全部卖出</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 机器学习机器人策略 -->
+                <div>
+                    <h3 class="text-lg font-medium text-gray-800 mb-3 flex items-center">
+                        <i class="fa fa-brain mr-2 text-purple-600"></i>机器学习机器人策略
+                    </h3>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div class="bg-gray-50 p-4 rounded-lg">
+                            <h4 class="font-medium text-gray-800 mb-2">强化学习</h4>
+                            <ul class="list-disc list-inside text-gray-600 text-sm space-y-1">
+                                <li>基于Q-learning算法</li>
+                                <li>从历史数据中学习最优策略</li>
+                                <li>通过奖励机制不断优化决策</li>
+                                <li>平衡探索与利用（ε-贪婪策略）</li>
+                            </ul>
+                        </div>
+                        <div class="bg-gray-50 p-4 rounded-lg">
+                            <h4 class="font-medium text-gray-800 mb-2">状态特征</h4>
+                            <ul class="list-disc list-inside text-gray-600 text-sm space-y-1">
+                                <li>当前价格和价格变化率</li>
+                                <li>RSI和MACD技术指标</li>
+                                <li>持仓状态（持有现金/股票）</li>
+                                <li>资产变化率</li>
+                            </ul>
+                        </div>
+                        <div class="bg-gray-50 p-4 rounded-lg">
+                            <h4 class="font-medium text-gray-800 mb-2">交易规则</h4>
+                            <ul class="list-disc list-inside text-gray-600 text-sm space-y-1">
+                                <li>每次交易最多使用50%可用资金购买（上限30股）</li>
+                                <li>可执行买入、卖出或持有操作</li>
+                                <li>交易成本会影响奖励计算</li>
+                                <li>探索率随时间逐渐降低</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 页脚 -->
+    <footer class="mt-12 py-6 bg-gray-800 text-white text-center">
+        <p>© 2025 股票买卖练习 - 虚拟交易，真实体验</p>
+    </footer>
+
+    <!-- JavaScript -->
+    <script src="app.js"></script>
+</body>
+</html>
