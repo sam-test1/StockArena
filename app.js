@@ -1,49 +1,49 @@
 // ====================================================================
-// 多股票交易模拟器 - 支持多只不同特征的股票，AI 可自由选择购买哪只
+// Multi-Stock Trading Simulator - Supports multiple stocks with different characteristics, AI can freely choose which to buy
 // ====================================================================
 
-// ========== 股票池配置 ==========
-// 每只股票有不同的波动率、漂移、相关性、起价，AI 可在不同股票间自由切换
+// ========== Stock Pool Configuration ==========
+// Each stock has different volatility, drift, correlation, starting price; AI can freely switch between stocks
 const STOCKS = [
     {
-        symbol: 'AAPL', name: '科技蓝筹', sector: '科技',
+        symbol: 'AAPL', name: 'Tech Blue Chip', sector: 'Tech',
         startPrice: 1.00, color: '#1a56db', beta: 1.05, liquidity: 1.15,
         driftBias: 0.0006, volMult: 0.9, regimeWeights: { bull: 0.4, bear: 0.15, range: 0.4, crash: 0.05 },
-        description: '稳健的科技龙头，趋势温和，波动较低。',
+        description: 'Stable tech leader, mild trend, low volatility.',
     },
     {
-        symbol: 'MSFT', name: '稳健成长', sector: '科技',
+        symbol: 'MSFT', name: 'Steady Growth', sector: 'Tech',
         startPrice: 1.20, color: '#0ea5e9', beta: 0.95, liquidity: 1.2,
         driftBias: 0.0005, volMult: 0.85, regimeWeights: { bull: 0.35, bear: 0.15, range: 0.45, crash: 0.05 },
-        description: '低波动、慢牛行情，适合长期持有。',
+        description: 'Low volatility, slow bull market, suitable for long-term holding.',
     },
     {
-        symbol: 'TSLA', name: '高波动', sector: '汽车',
+        symbol: 'TSLA', name: 'High Volatility', sector: 'Auto',
         startPrice: 0.85, color: '#ef4444', beta: 1.65, liquidity: 0.9,
         driftBias: 0.0008, volMult: 1.7, regimeWeights: { bull: 0.3, bear: 0.25, range: 0.25, crash: 0.2 },
-        description: '高波动率，常出现暴涨暴跌，机会与风险并存。',
+        description: 'High volatility, often sees sharp rises and falls, opportunity and risk coexist.',
     },
     {
-        symbol: 'NVDA', name: '热门赛道', sector: '芯片',
+        symbol: 'NVDA', name: 'Hot Sector', sector: 'Chip',
         startPrice: 1.50, color: '#9333ea', beta: 1.45, liquidity: 1.0,
         driftBias: 0.0012, volMult: 1.4, regimeWeights: { bull: 0.4, bear: 0.2, range: 0.25, crash: 0.15 },
-        description: '高成长高波动，AI 风口赛道，趋势强。',
+        description: 'High growth, high volatility, AI hot sector, strong trend.',
     },
     {
-        symbol: 'COIN', name: '加密概念', sector: '金融',
+        symbol: 'COIN', name: 'Crypto Concept', sector: 'Finance',
         startPrice: 0.70, color: '#f59e0b', beta: 1.9, liquidity: 0.65,
         driftBias: 0.0000, volMult: 2.2, regimeWeights: { bull: 0.25, bear: 0.3, range: 0.2, crash: 0.25 },
-        description: '跟随加密货币波动，肥尾分布，价格剧烈震荡。',
+        description: 'Follows crypto volatility, fat-tail distribution, violent price swings.',
     },
     {
-        symbol: 'KO', name: '防御消费', sector: '消费',
+        symbol: 'KO', name: 'Defensive Consumer', sector: 'Consumer',
         startPrice: 1.00, color: '#10b981', beta: 0.45, liquidity: 1.4,
         driftBias: 0.0002, volMult: 0.55, regimeWeights: { bull: 0.25, bear: 0.15, range: 0.55, crash: 0.05 },
-        description: '防御型蓝筹，波动小，震荡为主。',
+        description: 'Defensive blue chip, low volatility, mainly range-bound.',
     },
 ];
 
-// ========== 全局状态 ==========
+// ========== Global State ==========
 let isSimulationRunning = false;
 let isMachineTradingEnabled = false;
 let isMLRobotEnabled = false;
@@ -53,17 +53,17 @@ let simulationInterval;
 let currentTimeRange = 5;
 let startTime;
 
-// 当前正在查看/手动交易的股票
+// Currently viewing/manually trading stock
 let currentSymbol = STOCKS[0].symbol;
 
-// 每只股票的价格历史与技术指标（按 symbol 存储）
+// Price history and technical indicators for each stock (stored by symbol)
 const stockState = {};
-// 每个交易者的每只股票持仓（user / machine / mlRobot）
+// Per-trader per-stock holdings (user / machine / mlRobot)
 const userHoldings = {};
 const machineHoldings = {};
 const mlRobotHoldings = {};
 
-// 资产曲线（按时间汇总的总额）
+// Asset curves (total aggregated by time)
 let assetTimeData = [];
 let userAssetData = [];
 let machineAssetData = [];
@@ -72,10 +72,10 @@ let mlRobotPortfolioReturnWindow = [];
 let mlRobotPortfolioSharpeHistory = [];
 let lastMLPortfolioValue = null;
 
-// 跨股票总览
+// Cross-stock overview
 const lastAssetRecordTime = { value: Date.now() };
 
-// ========== 初始化每只股票的状态 ==========
+// ========== Initialize each stock's state ==========
 function initStockStates() {
     for (const s of STOCKS) {
         stockState[s.symbol] = {
@@ -97,7 +97,7 @@ function initStockStates() {
             regimeStepsLeft: 30,
             garchVariance: 0.0009,
             volumeARState: 1.0,
-            // 这只股票的 startPrice 锚点（用于"买入持有"基准）
+            // This stock's startPrice anchor (for buy-and-hold benchmark)
             startPriceRef: s.startPrice,
         };
 
@@ -121,18 +121,18 @@ function initStockStates() {
     }
 }
 
-// 用户/Machine/ML 机器人的总现金（跨所有股票共享）
+// User/Machine/ML Robot total cash (shared across all stocks)
 let userCash = 100.00;
 let machineCash = 100.00;
 let mlRobotCash = 100.00;
 
-// 机器交易状态（跨股票）
+// Machine trading state (cross-stock)
 let machinePeakAsset = 100;
 let machineConsecutiveLosses = 0;
 let machineLossCooldownUntil = 0;
 let machineLastTradeProfit = 0;
 
-// ML 机器人跨股票状态
+// ML Robot cross-stock state
 const mlRobotStats = {
     startTime: Date.now(),
     maxDrawdown: 0,
@@ -156,14 +156,14 @@ const mlRobotStats = {
     isProcessing: false,
 };
 
-// ML 配置常量
+// ML configuration constants
 const Q_TABLE_MAX_SIZE = 5000;
 const EPSILON_DECAY_STEP = 10;
 const REWARD_WINDOW = 50;
 const SHARPE_WINDOW = 60;
 const ML_AUTO_SAVE_INTERVAL_MS = 5 * 60 * 1000;
 
-// 规则机器人交易参数
+// Rule-based robot trading parameters
 const MAX_DRAWDOWN_THRESHOLD = 0.15;
 const MAX_CONSECUTIVE_LOSSES = 3;
 const LOSS_COOLDOWN_MS = 60 * 1000;
@@ -177,13 +177,13 @@ const MACHINE_MAX_POSITION_RATIO = 0.35;
 const MACHINE_MAX_NEW_BUYS_PER_STEP = 2;
 const MACHINE_CASH_RESERVE_RATIO = 0.05;
 
-// 学习 AI 组合约束：允许同时持有多只股票，但控制单股集中度和现金垫。
+// Learning AI portfolio constraints: allow holding multiple stocks simultaneously, but control single-stock concentration and cash buffer.
 const ML_MAX_POSITIONS = 4;
 const ML_MAX_POSITION_RATIO = 0.35;
 const ML_MAX_NEW_BUYS_PER_STEP = 3;
 const ML_CASH_RESERVE_RATIO = 0.05;
 
-// 全市场共同因子，让多股走势更像真实市场：个股不再完全独立随机游走。
+// Market-wide common factor, making multi-stock movements more like real markets: individual stocks are no longer completely independent random walks.
 const globalMarketState = {
     tick: 0,
     regime: 'range',
@@ -194,20 +194,20 @@ const globalMarketState = {
     sectorReturns: {},
 };
 
-// ML 后端
+// ML backend
 const ML_API_URL = window.location.origin;
 
-// 周期自动保存
+// Periodic auto-save
 let mlAutoSaveTimer = null;
 let mlAutoSaveInFlight = false;
 let saveQTableTimer = null;
 let saveQTablePending = false;
 
-// 图表对象
+// Chart objects
 let priceChart, rsiChart, macdChart, assetChart;
 let rewardChart, accuracyChart, sharpeChart;
 
-// DOM 元素引用
+// DOM element references
 let startBtn, cashDisplay, totalAssetDisplay, currentPriceDisplay;
 let priceChangeDisplay, priceIndicator, buyMessage;
 let sellSharesInput, sellBtn, sellMessage, transactionHistoryTable;
@@ -217,7 +217,7 @@ let mlRobotToggle, learningRateSlider, learningRateDisplay;
 let explorationRateSlider, explorationRateDisplay, resetMLModelBtn, mlRobotTransactionsBtn;
 let currentSharpeDisplay;
 let stockSelector, stockListEl, stockCardsEl, currentStockNameEl, currentStockSectorEl;
-// 用户/规则机器人/学习机器人 现金与总值显示
+// User/Rule Robot/Learning Robot cash and total value display
 let machineCashDisplay, machineTotalAssetDisplay;
 let mlRobotCashDisplay, mlRobotTotalAssetDisplay;
 let currentSharesDisplay, currentCostDisplay, currentValueDisplay;
@@ -229,17 +229,17 @@ let btTotalReward, btAvgReward, btWinRate, btTradeCount, btProfitFactor;
 let btAvgPnL, btMaxDrawdown, btMaxDDAsset, btFloatingPnL, btFees;
 let btAlphas, btMachine, btBuyHold, backtestSessionDuration, resetBacktestBtn;
 
-// 预训练相关
+// Pretraining related
 let isPretraining = false;
 let pretrainProgressContainer, pretrainProgressBar, pretrainProgressPercent;
 let pretrainStatus, pretrainAccuracy, pretrainQTableSize;
 let pretrainCancelRequested = false;
 
-// 当前正在查看的交易历史类型
+// Currently viewing transaction history type
 let currentTxView = 'user'; // 'user' | 'machine' | 'mlRobot'
 
 // ====================================================================
-// 工具函数
+// Utility Functions
 // ====================================================================
 
 let _spareGaussian = null;
@@ -296,7 +296,7 @@ function calculateSharpeRatio(returns, minSamples = 2) {
     const variance = clean.reduce((a, b) => a + (b - mean) ** 2, 0) / clean.length;
     const std = Math.sqrt(variance);
     if (std <= 1e-8) return mean >= 0 ? 0 : -0;
-    // 以滚动 tick 为单位，乘 sqrt(60) 让读数更接近短周期年化/日内尺度。
+    // Multiply by sqrt(60) to make readings closer to short-period annualized/intraday scale, using rolling tick as unit.
     return (mean / std) * Math.sqrt(Math.min(60, clean.length));
 }
 function recordMLPortfolioMetrics(totalValue) {
@@ -332,7 +332,7 @@ function calculateSMA(data, window) {
 }
 
 // ====================================================================
-// 价格生成（每只股票独立）
+// Price Generation (independent per stock)
 // ====================================================================
 const MARKET_REGIMES = {
     bull:  { drift: 0.0011, volMult: 0.95, weights: { bull: 0.58, range: 0.25, bear: 0.12, crash: 0.05 } },
@@ -342,11 +342,11 @@ const MARKET_REGIMES = {
 };
 
 const SECTOR_BETA = {
-    '科技': 1.15,
-    '汽车': 1.35,
-    '芯片': 1.30,
-    '金融': 1.20,
-    '消费': 0.55,
+    'Tech': 1.15,
+    'Auto': 1.35,
+    'Chip': 1.30,
+    'Finance': 1.20,
+    'Consumer': 0.55,
 };
 
 function pickWeighted(weights, fallback = 'range') {
@@ -370,7 +370,7 @@ function generateMarketStep() {
 
     const regime = MARKET_REGIMES[globalMarketState.regime] || MARKET_REGIMES.range;
     const phase = (globalMarketState.tick % 240) / 240;
-    // U 型日内波动：开盘/尾盘更活跃，中段更平稳。
+    // U-shaped intraday volatility: more active at open/close, calmer in the middle.
     const intradayVolMult = 0.75 + 0.55 * Math.abs(Math.cos(2 * Math.PI * phase));
     const shockDecay = 0.88;
     if (Math.random() < 0.012) {
@@ -398,7 +398,7 @@ function generateNewPrice(symbol) {
     const cfg = STOCKS.find(s => s.symbol === symbol);
     st.lastPrice = st.currentPrice;
 
-    // 1) 个股状态切换（受全市场 regime 影响，但保留个股独立性）
+    // 1) Individual stock regime switching (influenced by market-wide regime, but retains independence)
     if (st.regimeStepsLeft <= 0) {
         const mixedWeights = { ...cfg.regimeWeights };
         mixedWeights[globalMarketState.regime] = (mixedWeights[globalMarketState.regime] || 0) + 0.20;
@@ -410,7 +410,7 @@ function generateNewPrice(symbol) {
     st.regimeStepsLeft = Math.max(0, st.regimeStepsLeft - 1);
     const regime = MARKET_REGIMES[st.marketRegime];
 
-    // 2) GARCH 波动率：更低的基础波动 + 肥尾冲击，避免价格每秒过度跳动。
+    // 2) GARCH volatility: lower base volatility + fat-tail shocks, avoiding excessive per-second price jumps.
     const GARCH_OMEGA = 0.000006, GARCH_ALPHA = 0.07, GARCH_BETA = 0.91;
     let baseVol = 0.010 * regime.volMult * cfg.volMult;
     if (st.priceData.length >= 2) {
@@ -425,7 +425,7 @@ function generateNewPrice(symbol) {
     }
     const volatility = baseVol;
 
-    // 3) 漂移：市场共同因子 + 行业因子 + 个股 bias + 均值回归 + 温和动量
+    // 3) Drift: market common factor + sector factor + stock bias + mean reversion + mild momentum
     let drift = regime.drift + cfg.driftBias;
     const marketComponent = (cfg.beta || 1) * globalMarketState.lastReturn;
     const sectorComponent = globalMarketState.sectorReturns[cfg.sector] || 0;
@@ -448,7 +448,7 @@ function generateNewPrice(symbol) {
         drift += 0.10 * Math.max(-0.012, Math.min(0.012, momentum));
     }
 
-    // 4) 噪声 + 情绪 + 个股新闻。用 log return 合成，涨跌幅更接近真实交易。
+    // 4) Noise + sentiment + stock-specific news. Use log return composition, making price changes closer to real trading.
     const tNoise = studentT(7) / Math.sqrt(7 / 5);
     let sentiment = 0;
     if (Math.random() < 0.025) sentiment = (Math.random() - 0.5) * 0.018 * cfg.volMult;
@@ -458,7 +458,7 @@ function generateNewPrice(symbol) {
         news = newsSign * (0.012 + Math.random() * 0.045) * cfg.volMult;
     }
 
-    // 5) 合成新价
+    // 5) Synthesize new price
     let totalChange = drift + marketComponent + sectorComponent + tNoise * volatility + sentiment + news;
     const clipDown = globalMarketState.regime === 'crash' ? -0.13 : -0.08;
     const clipUp = globalMarketState.regime === 'bull' ? 0.09 : 0.07;
@@ -471,14 +471,14 @@ function generateNewPrice(symbol) {
     }
     st.currentPrice = parseFloat(newPrice.toFixed(2));
 
-    // 6) OHLC 范围：high/low 包含上一价与收盘价，避免 K 线不可能形态。
+    // 6) OHLC range: high/low includes previous price and close, avoiding impossible candle patterns.
     const open = st.lastPrice;
     const close = st.currentPrice;
     const intrabarRange = Math.max(0.003, close * (volatility + Math.abs(totalChange) * 0.30) * (0.7 + Math.random() * 0.8));
     const simulatedHigh = parseFloat((Math.max(open, close) + intrabarRange * (0.35 + Math.random() * 0.45)).toFixed(2));
     const simulatedLow = parseFloat(Math.max(0.01, Math.min(open, close) - intrabarRange * (0.35 + Math.random() * 0.45)).toFixed(2));
 
-    // 7) 量能：和波动、新闻、下跌恐慌、流动性绑定，带 AR 平滑。
+    // 7) Volume: tied to volatility, news, downside panic, liquidity, with AR smoothing.
     const absChange = Math.abs(totalChange);
     const trendVolumeBoost = absChange * 18;
     const downsideBoost = totalChange < -0.015 ? 0.8 : 0;
@@ -489,7 +489,7 @@ function generateNewPrice(symbol) {
     st.volumeARState = Math.max(0.25, Math.min(5.0, st.volumeARState));
     const simulatedVolume = Math.max(800, Math.round(12000 * st.volumeARState * (0.85 + Math.random() * 0.3)));
 
-    // 8) 推送序列
+    // 8) Push series
     const now = new Date();
     const timeLabel = now.getHours().toString().padStart(2, '0') + ':' +
                      now.getMinutes().toString().padStart(2, '0') + ':' +
@@ -513,7 +513,7 @@ function generateNewPrice(symbol) {
 }
 
 // ====================================================================
-// 技术指标
+// Technical Indicators
 // ====================================================================
 function calculateTechnicalIndicators(symbol) {
     const st = stockState[symbol];
@@ -595,7 +595,7 @@ function calculateRecentVolatility(prices) {
 }
 
 // ====================================================================
-// 模拟控制
+// Simulation Control
 // ====================================================================
 function toggleSimulation() {
     if (isSimulationRunning) {
@@ -603,7 +603,7 @@ function toggleSimulation() {
         stopAutoSave();
         flushSaveQTable();
         saveMLModel();
-        startBtn.innerHTML = '<i class="fa fa-play-circle mr-2"></i>开始训练';
+        startBtn.innerHTML = '<i class="fa fa-play-circle mr-2"></i>Start Training';
         startBtn.classList.remove('bg-danger');
         startBtn.classList.add('bg-primary');
         buySharesBtns.forEach(btn => { btn.disabled = true; btn.classList.add('opacity-50', 'cursor-not-allowed'); });
@@ -612,11 +612,11 @@ function toggleSimulation() {
     } else {
         startTime = new Date();
         resetChartData();
-        // 开始交易前，从 Python ML 后端加载最新模型
+        // Before trading starts, load latest model from Python ML backend
         reloadLatestMLModel();
         simulationInterval = setInterval(updateSimulation, 1000);
         startAutoSave();
-        startBtn.innerHTML = '<i class="fa fa-stop-circle mr-2"></i>停止训练';
+        startBtn.innerHTML = '<i class="fa fa-stop-circle mr-2"></i>Stop Training';
         startBtn.classList.remove('bg-primary');
         startBtn.classList.add('bg-danger');
         buySharesBtns.forEach(btn => { btn.disabled = false; btn.classList.remove('opacity-50', 'cursor-not-allowed'); });
@@ -626,14 +626,14 @@ function toggleSimulation() {
 }
 
 function updateSimulation() {
-    // 1) 先生成全市场共同因子，再让每只股票在同一市场环境中报价
+    // 1) First generate market-wide common factor, then let each stock quote in the same market environment
     generateMarketStep();
     for (const s of STOCKS) {
         generateNewPrice(s.symbol);
         calculateTechnicalIndicators(s.symbol);
     }
 
-    // 2) AI 交易：扫描所有股票并做组合级调仓
+    // 2) AI trading: scan all stocks and do portfolio-level rebalancing
     if (isMachineTradingEnabled) {
         executeMachinePortfolioTrading();
     }
@@ -654,7 +654,7 @@ function updateSimulation() {
 }
 
 // ====================================================================
-// 图表更新
+// Chart Update
 // ====================================================================
 function updateCharts() {
     const st = getCurrentStock();
@@ -691,7 +691,7 @@ function updateCharts() {
     document.getElementById('rsiChart').parentNode.parentNode.style.display = rsiCheckbox.checked ? 'block' : 'none';
     document.getElementById('macdChart').parentNode.parentNode.style.display = macdCheckbox.checked ? 'block' : 'none';
 
-    // 更新当前价格显示
+    // Update current price display
     if (st.priceData.length > 0) {
         const lastIdx = st.priceData.length - 1;
         const priceChange = st.currentPrice - st.lastPrice;
@@ -717,8 +717,8 @@ function updateMLCharts() {
 
     const maxDataPoints = 50;
 
-    // 汇总所有 6 只股票的历史：每步取一个聚合值（平均）
-    // 累计奖励：把 6 只股票每步的奖励求和
+    // Aggregate history of all 6 stocks: take one aggregated value per step (average)
+    // Cumulative reward: sum rewards of 6 stocks per step
     let maxLen = 0;
     for (const s of STOCKS) {
         maxLen = Math.max(maxLen, mlRobotHoldings[s.symbol].rewardHistory.length);
@@ -736,15 +736,15 @@ function updateMLCharts() {
             if (i < rh.accuracyHistory.length) { sumA += rh.accuracyHistory[i]; cntA++; }
             if (i < rh.sharpeHistory.length) { sumS += rh.sharpeHistory[i]; cntS++; }
         }
-        // 累计奖励用"求和"——6 只股票的总奖励
+        // Cumulative reward uses sum — total reward of 6 stocks
         rewardData.push(cntR > 0 ? parseFloat((sumR).toFixed(2)) : 0);
-        // 准确率用平均
+        // Accuracy uses average
         accuracyData.push(cntA > 0 ? parseFloat((sumA / cntA).toFixed(2)) : 0);
-        // 单股夏普保留给兼容；优先展示组合级夏普
+        // Per-stock Sharpe retained for compatibility; prioritize portfolio-level Sharpe
         perStockSharpeData.push(cntS > 0 ? parseFloat((sumS / cntS).toFixed(3)) : 0);
     }
 
-    // 取最近 50 个数据点
+    // Take latest 50 data points
     const labels = rewardData.map((_, i) => `${i + 1}`);
     const rSliced = rewardData.slice(-maxDataPoints);
     const aSliced = accuracyData.slice(-maxDataPoints);
@@ -767,7 +767,7 @@ function updateMLCharts() {
         sharpeChart.update('none');
 
         if (currentSharpeDisplay) {
-            // 末尾夏普值
+            // Tail Sharpe value
             const last = sSliced.length > 0 ? sSliced[sSliced.length - 1] : null;
             currentSharpeDisplay.textContent = last === null ? '--' : last.toFixed(2);
             currentSharpeDisplay.classList.remove('text-green-600', 'text-red-600', 'text-gray-500');
@@ -808,27 +808,27 @@ function updateAssetDisplay() {
     const mh = machineHoldings[currentSymbol];
     const rh = mlRobotHoldings[currentSymbol];
 
-    // 用户
+    // User
     cashDisplay.textContent = '¥' + userCash.toFixed(2);
-    if (currentSharesDisplay) currentSharesDisplay.textContent = uh.shares + ' 股';
+    if (currentSharesDisplay) currentSharesDisplay.textContent = uh.shares + ' shares';
     const avgCost = uh.shares > 0 ? (uh.totalInvested / uh.shares) : 0;
     if (currentCostDisplay) currentCostDisplay.textContent = '¥' + avgCost.toFixed(2);
     const stockValue = uh.shares * st.currentPrice;
     if (currentValueDisplay) currentValueDisplay.textContent = '¥' + stockValue.toFixed(2);
     totalAssetDisplay.textContent = '¥' + getUserTotalAsset().toFixed(2);
 
-    // 规则机器人
+    // Rule Robot
     if (machineCashDisplay) machineCashDisplay.textContent = '¥' + machineCash.toFixed(2);
-    if (machineSharesDisplay) machineSharesDisplay.textContent = mh.shares + ' 股';
+    if (machineSharesDisplay) machineSharesDisplay.textContent = mh.shares + ' shares';
     const mAvgCost = mh.shares > 0 ? (mh.totalInvested / mh.shares) : 0;
     if (machineCostDisplay) machineCostDisplay.textContent = '¥' + mAvgCost.toFixed(2);
     const mStockValue = mh.shares * st.currentPrice;
     if (machineValueDisplay) machineValueDisplay.textContent = '¥' + mStockValue.toFixed(2);
     if (machineTotalAssetDisplay) machineTotalAssetDisplay.textContent = '¥' + getMachineTotalAsset().toFixed(2);
 
-    // ML 机器人
+    // ML Robot
     if (mlRobotCashDisplay) mlRobotCashDisplay.textContent = '¥' + mlRobotCash.toFixed(2);
-    if (mlRobotSharesDisplay) mlRobotSharesDisplay.textContent = rh.shares + ' 股';
+    if (mlRobotSharesDisplay) mlRobotSharesDisplay.textContent = rh.shares + ' shares';
     const rAvgCost = rh.shares > 0 ? (rh.totalInvested / rh.shares) : 0;
     if (mlRobotCostDisplay) mlRobotCostDisplay.textContent = '¥' + rAvgCost.toFixed(2);
     const rStockValue = rh.shares * st.currentPrice;
@@ -839,7 +839,7 @@ function updateAssetDisplay() {
 }
 
 // ====================================================================
-// 回测信息
+// Backtest Information
 // ====================================================================
 function updateBacktestInfo() {
     if (!btTotalAsset) return;
@@ -849,7 +849,7 @@ function updateBacktestInfo() {
     const startCash = 100;
     const returnRate = (mlTotal - startCash) / startCash;
 
-    // 浮动盈亏
+    // Floating P&L
     let floating = 0;
     for (const s of STOCKS) {
         const rh = mlRobotHoldings[s.symbol];
@@ -884,7 +884,7 @@ function updateBacktestInfo() {
     const accPct = mlRobotStats.totalDecisions > 0
         ? (mlRobotStats.correctDecisions / mlRobotStats.totalDecisions) * 100 : 0;
     btAccuracy.textContent = accPct.toFixed(1) + '%';
-    btDecisions.textContent = mlRobotStats.totalDecisions + ' 次决策';
+    btDecisions.textContent = mlRobotStats.totalDecisions + ' decisions';
 
     const totalR = mlRobotStats.totalReward;
     let allRewards = [];
@@ -892,16 +892,16 @@ function updateBacktestInfo() {
     const avgR = allRewards.length > 0 ? allRewards.reduce((a, b) => a + b, 0) / allRewards.length : 0;
     btTotalReward.textContent = totalR.toFixed(2);
     btTotalReward.className = 'text-lg font-bold ' + (totalR >= 0 ? 'text-amber-700' : 'text-red-600');
-    btAvgReward.textContent = '平均 ' + (avgR >= 0 ? '+' : '') + avgR.toFixed(2);
+    btAvgReward.textContent = 'Avg ' + (avgR >= 0 ? '+' : '') + avgR.toFixed(2);
 
     const trades = mlRobotStats.winTrades + mlRobotStats.lossTrades;
     const winRate = trades > 0 ? (mlRobotStats.winTrades / trades) * 100 : null;
     btWinRate.textContent = winRate === null ? '--' : winRate.toFixed(1) + '%';
-    btTradeCount.textContent = trades + ' 笔成交';
+    btTradeCount.textContent = trades + ' trades';
 
     if (trades === 0) {
         btProfitFactor.textContent = '--';
-        btAvgPnL.textContent = '单笔 0.00';
+        btAvgPnL.textContent = 'Per trade 0.00';
     } else {
         const factor = mlRobotStats.grossLoss < 0
             ? mlRobotStats.grossProfit / Math.abs(mlRobotStats.grossLoss)
@@ -909,14 +909,14 @@ function updateBacktestInfo() {
         btProfitFactor.textContent = factor === Infinity ? '∞' : factor.toFixed(2);
         const totalPnL = mlRobotStats.grossProfit + mlRobotStats.grossLoss;
         const avgPnL = totalPnL / trades;
-        btAvgPnL.textContent = '单笔 ' + (avgPnL >= 0 ? '+' : '') + avgPnL.toFixed(2);
+        btAvgPnL.textContent = 'Per trade ' + (avgPnL >= 0 ? '+' : '') + avgPnL.toFixed(2);
     }
 
     btMaxDrawdown.textContent = (mlRobotStats.maxDrawdown * 100).toFixed(2) + '%';
-    btMaxDDAsset.textContent = '峰值 ¥' + mlRobotStats.maxDrawdownAsset.toFixed(2);
+    btMaxDDAsset.textContent = 'Peak ¥' + mlRobotStats.maxDrawdownAsset.toFixed(2);
     btFloatingPnL.textContent = (floating >= 0 ? '+' : '') + '¥' + floating.toFixed(2);
     btFloatingPnL.className = 'text-base font-semibold ' + (floating >= 0 ? 'text-green-600' : 'text-red-600');
-    btFees.textContent = '手续费 ¥' + mlRobotStats.totalFees.toFixed(2);
+    btFees.textContent = 'Fees ¥' + mlRobotStats.totalFees.toFixed(2);
 
     const fmtPct = (v) => (v >= 0 ? '+' : '') + (v * 100).toFixed(2) + '%';
     btAlphas.textContent = fmtPct(returnRate);
@@ -924,7 +924,7 @@ function updateBacktestInfo() {
     btMachine.textContent = fmtPct((machineTotal - startCash) / startCash);
     btMachine.className = 'font-semibold ' + (machineTotal >= startCash ? 'text-green-600' : 'text-red-600');
 
-    // 买入持有基准：所有股票平均
+    // Buy-and-hold benchmark: average of all stocks
     let buyHoldAvg = 0;
     for (const s of STOCKS) {
         buyHoldAvg += (stockState[s.symbol].currentPrice - s.startPrice) / s.startPrice;
@@ -936,19 +936,19 @@ function updateBacktestInfo() {
     if (backtestSessionDuration) {
         const minutes = Math.floor((Date.now() - mlRobotStats.startTime) / 60000);
         const seconds = Math.floor(((Date.now() - mlRobotStats.startTime) % 60000) / 1000);
-        backtestSessionDuration.textContent = `会话 ${minutes} 分 ${seconds} 秒`;
+        backtestSessionDuration.textContent = `Session ${minutes}m ${seconds}s`;
     }
 }
 
 // ====================================================================
-// 交易操作
+// Trading Operations
 // ====================================================================
 function handleBuy(shares, opts = {}) {
     // opts.isMachine / opts.isMLRobot
     const { isMachine = false, isMLRobot = false } = opts;
     if (isNaN(shares) || shares <= 0) {
         if (!isMachine && !isMLRobot) {
-            buyMessage.textContent = '请选择有效的股数';
+            buyMessage.textContent = 'Please select a valid number of shares';
             buyMessage.classList.add('text-danger');
         }
         return false;
@@ -970,7 +970,7 @@ function handleBuy(shares, opts = {}) {
         rh.shares += shares;
         const fee = cost * 0.001;
         mlRobotStats.totalFees += fee;
-        rh.txHistory.push({ time: timeLabel, timestamp: Date.now(), type: '买入', symbol: currentSymbol, price: st.currentPrice, shares, amount: cost, fee });
+        rh.txHistory.push({ time: timeLabel, timestamp: Date.now(), type: 'Buy', symbol: currentSymbol, price: st.currentPrice, shares, amount: cost, fee });
         return true;
     } else if (isMachine) {
         if (cost > machineCash) return false;
@@ -979,11 +979,11 @@ function handleBuy(shares, opts = {}) {
         machineCash = parseFloat(machineCash.toFixed(2));
         mh.totalInvested += cost;
         mh.shares += shares;
-        mh.txHistory.push({ time: timeLabel, timestamp: Date.now(), type: '买入', symbol: currentSymbol, price: st.currentPrice, shares, amount: cost });
+        mh.txHistory.push({ time: timeLabel, timestamp: Date.now(), type: 'Buy', symbol: currentSymbol, price: st.currentPrice, shares, amount: cost });
         return true;
     } else {
         if (cost > userCash) {
-            buyMessage.textContent = '资金不足';
+            buyMessage.textContent = 'Insufficient funds';
             buyMessage.classList.add('text-danger');
             return false;
         }
@@ -992,8 +992,8 @@ function handleBuy(shares, opts = {}) {
         userCash = parseFloat(userCash.toFixed(2));
         uh.totalInvested += cost;
         uh.shares += shares;
-        uh.txHistory.push({ time: timeLabel, timestamp: Date.now(), type: '买入', symbol: currentSymbol, price: st.currentPrice, shares, amount: cost });
-        buyMessage.textContent = '买入成功';
+        uh.txHistory.push({ time: timeLabel, timestamp: Date.now(), type: 'Buy', symbol: currentSymbol, price: st.currentPrice, shares, amount: cost });
+        buyMessage.textContent = 'Buy successful';
         buyMessage.classList.remove('text-danger');
         buyMessage.classList.add('text-success');
         setTimeout(() => { buyMessage.textContent = ''; }, 3000);
@@ -1008,7 +1008,7 @@ function handleSell(shares, opts = {}) {
     if (!isMachine && !isMLRobot) {
         shares = parseInt(sellSharesInput.value);
         if (isNaN(shares) || shares <= 0) {
-            sellMessage.textContent = '请输入有效的股数';
+            sellMessage.textContent = 'Please enter a valid number of shares';
             sellMessage.classList.add('text-danger');
             return false;
         }
@@ -1033,7 +1033,7 @@ function handleSell(shares, opts = {}) {
         rh.shares -= actual;
         const sellFee = revenue * 0.001;
         mlRobotStats.totalFees += sellFee;
-        rh.txHistory.push({ time: timeLabel, timestamp: Date.now(), type: '卖出', symbol: currentSymbol, price: st.currentPrice, shares: actual, amount: revenue, fee: sellFee });
+        rh.txHistory.push({ time: timeLabel, timestamp: Date.now(), type: 'Sell', symbol: currentSymbol, price: st.currentPrice, shares: actual, amount: revenue, fee: sellFee });
         return true;
     } else if (isMachine) {
         const mh = machineHoldings[currentSymbol];
@@ -1047,12 +1047,12 @@ function handleSell(shares, opts = {}) {
         }
         mh.shares -= actual;
         if (mh.shares <= 0) { mh.shares = 0; mh.totalInvested = 0; mh.stopLoss = null; mh.trailingHigh = null; mh.entryTime = null; mh.tookProfit1 = false; mh.tookProfit2 = false; }
-        mh.txHistory.push({ time: timeLabel, timestamp: Date.now(), type: '卖出', symbol: currentSymbol, price: st.currentPrice, shares: actual, amount: revenue });
+        mh.txHistory.push({ time: timeLabel, timestamp: Date.now(), type: 'Sell', symbol: currentSymbol, price: st.currentPrice, shares: actual, amount: revenue });
         return true;
     } else {
         const uh = userHoldings[currentSymbol];
         if (shares <= 0 || shares > uh.shares) {
-            sellMessage.textContent = shares <= 0 ? '请输入有效的股数' : '持股不足';
+            sellMessage.textContent = shares <= 0 ? 'Please enter a valid number of shares' : 'Insufficient shares';
             sellMessage.classList.add('text-danger');
             return false;
         }
@@ -1064,9 +1064,9 @@ function handleSell(shares, opts = {}) {
             uh.totalInvested = Math.max(0, uh.totalInvested);
         }
         uh.shares -= actual;
-        uh.txHistory.push({ time: timeLabel, timestamp: Date.now(), type: '卖出', symbol: currentSymbol, price: st.currentPrice, shares: actual, amount: revenue });
+        uh.txHistory.push({ time: timeLabel, timestamp: Date.now(), type: 'Sell', symbol: currentSymbol, price: st.currentPrice, shares: actual, amount: revenue });
         sellSharesInput.value = '';
-        sellMessage.textContent = '卖出成功';
+        sellMessage.textContent = 'Sell successful';
         sellMessage.classList.remove('text-danger');
         sellMessage.classList.add('text-success');
         setTimeout(() => { sellMessage.textContent = ''; }, 3000);
@@ -1077,39 +1077,39 @@ function handleSell(shares, opts = {}) {
 }
 
 // ====================================================================
-// 交易记录显示
+// Transaction History Display
 // ====================================================================
 function updateTransactionHistory() {
     if (!transactionHistoryTable) return;
     transactionHistoryTable.innerHTML = '';
     let history, title;
     if (currentTxView === 'mlRobot') {
-        // 合并所有股票的 ML 交易
+        // Merge ML trades from all stocks
         history = [];
         for (const s of STOCKS) history = history.concat(mlRobotHoldings[s.symbol].txHistory);
         history.sort((a, b) => b.timestamp - a.timestamp);
-        title = '学习AI';
+        title = 'Learning AI';
     } else if (currentTxView === 'machine') {
         history = [];
         for (const s of STOCKS) history = history.concat(machineHoldings[s.symbol].txHistory);
         history.sort((a, b) => b.timestamp - a.timestamp);
-        title = '规则AI';
+        title = 'Rule AI';
     } else {
         history = [];
         for (const s of STOCKS) history = history.concat(userHoldings[s.symbol].txHistory);
         history.sort((a, b) => b.timestamp - a.timestamp);
-        title = '您的';
+        title = 'Your';
     }
 
     if (history.length === 0) {
-        transactionHistoryTable.innerHTML = `<tr><td colspan="6" class="px-4 py-4 text-center text-gray-500">暂无${title}交易记录</td></tr>`;
+        transactionHistoryTable.innerHTML = `<tr><td colspan="6" class="px-4 py-4 text-center text-gray-500">No ${title} transaction records</td></tr>`;
         return;
     }
 
     let html = '';
     for (const t of history) {
-        const typeClass = t.type === '买入' ? 'text-success' : 'text-danger';
-        const typeIcon = t.type === '买入' ? 'fa-arrow-up' : 'fa-arrow-down';
+        const typeClass = t.type === 'Buy' ? 'text-success' : 'text-danger';
+        const typeIcon = t.type === 'Buy' ? 'fa-arrow-up' : 'fa-arrow-down';
         html += `
             <tr>
                 <td class="px-4 py-3 whitespace-nowrap">${t.time}</td>
@@ -1120,7 +1120,7 @@ function updateTransactionHistory() {
                 </td>
                 <td class="px-4 py-3 whitespace-nowrap"><span class="inline-block px-1.5 py-0.5 rounded text-xs font-mono bg-gray-100">${t.symbol}</span></td>
                 <td class="px-4 py-3 whitespace-nowrap">¥${t.price.toFixed(2)}</td>
-                <td class="px-4 py-3 whitespace-nowrap">${t.shares} 股</td>
+                <td class="px-4 py-3 whitespace-nowrap">${t.shares} shares</td>
                 <td class="px-4 py-3 whitespace-nowrap font-medium">¥${t.amount.toFixed(2)}</td>
             </tr>`;
     }
@@ -1128,26 +1128,26 @@ function updateTransactionHistory() {
 }
 
 // ====================================================================
-// 规则机器人：扫描所有股票选最佳
+// Rule-based Robot: scan all stocks and pick best
 // ====================================================================
 function evaluateBuySignalForSymbol(symbol) {
     const st = stockState[symbol];
-    if (st.priceData.length < 30) return { canBuy: false, score: 0, reason: '数据不足' };
+    if (st.priceData.length < 30) return { canBuy: false, score: 0, reason: 'Insufficient data' };
 
     const ma5 = calculateSMA(st.priceData, 5);
     const ma20 = calculateSMA(st.priceData, 20);
     const ma60 = st.priceData.length >= 60 ? calculateSMA(st.priceData, 60) : null;
     const rsi21 = calculateRSIFromPrices(st.priceData, 21);
-    if (ma5 === null || ma20 === null || rsi21 === null) return { canBuy: false, score: 0, reason: '指标不足' };
+    if (ma5 === null || ma20 === null || rsi21 === null) return { canBuy: false, score: 0, reason: 'Insufficient indicators' };
 
     let score = 0;
     const reasons = [];
-    if (ma5 > ma20) { score += 2; reasons.push('金叉'); }
-    if (ma60 !== null && st.currentPrice > ma60) { score += 2; reasons.push('趋势线上'); }
-    if (isVolumeConfirmed(st, Math.min(60, st.volumeData.length), 1.2)) { score += 1; reasons.push('量能'); }
+    if (ma5 > ma20) { score += 2; reasons.push('Golden cross'); }
+    if (ma60 !== null && st.currentPrice > ma60) { score += 2; reasons.push('Above trend'); }
+    if (isVolumeConfirmed(st, Math.min(60, st.volumeData.length), 1.2)) { score += 1; reasons.push('Volume'); }
     if (isMacdHistogramRising(st)) { score += 1; reasons.push('MACD'); }
-    if (rsi21 < 85) { score += 1; reasons.push('RSI安全'); }
-    if (rsi21 < 40) { score += 2; reasons.push('超卖'); }
+    if (rsi21 < 85) { score += 1; reasons.push('RSI safe'); }
+    if (rsi21 < 40) { score += 2; reasons.push('Oversold'); }
 
     const atr = calculateATRFromState(st, 14);
     return { canBuy: score >= 4, score, reason: reasons.join('+'), atr };
@@ -1159,13 +1159,13 @@ function executeMachineTradingForStock(symbol) {
         const st = stockState[symbol];
         if (st.priceData.length < 2) return;
 
-        // 先把当前股票切到这支以便 handleBuy/Sell 内部读 currentSymbol
-        // 实际上我们显式传 symbol → 改用 executeBuy/SellBySymbol 函数
+        // First switch current stock to this one so handleBuy/Sell can read currentSymbol
+        // Actually we explicitly pass symbol → use executeBuy/SellBySymbol functions
         machineTradingForSymbol(symbol);
     } catch (e) { /* ignore */ }
 }
 
-// 显式指定股票版本的交易
+// Explicitly specify stock version of trading
 function machineBuy(symbol, shares) {
     if (shares <= 0) return;
     const st = stockState[symbol];
@@ -1180,7 +1180,7 @@ function machineBuy(symbol, shares) {
     const timeLabel = now.getHours().toString().padStart(2, '0') + ':' +
                      now.getMinutes().toString().padStart(2, '0') + ':' +
                      now.getSeconds().toString().padStart(2, '0');
-    mh.txHistory.push({ time: timeLabel, timestamp: Date.now(), type: '买入', symbol, price: st.currentPrice, shares, amount: cost });
+    mh.txHistory.push({ time: timeLabel, timestamp: Date.now(), type: 'Buy', symbol, price: st.currentPrice, shares, amount: cost });
 }
 function machineSell(symbol, shares) {
     if (shares <= 0) return;
@@ -1205,7 +1205,7 @@ function machineSell(symbol, shares) {
     const timeLabel = now.getHours().toString().padStart(2, '0') + ':' +
                      now.getMinutes().toString().padStart(2, '0') + ':' +
                      now.getSeconds().toString().padStart(2, '0');
-    mh.txHistory.push({ time: timeLabel, timestamp: Date.now(), type: '卖出', symbol, price: st.currentPrice, shares, amount: revenue });
+    mh.txHistory.push({ time: timeLabel, timestamp: Date.now(), type: 'Sell', symbol, price: st.currentPrice, shares, amount: revenue });
 }
 
 function manageMachinePosition(symbol) {
@@ -1239,7 +1239,7 @@ function manageMachinePosition(symbol) {
         return true;
     }
 
-    // 分级止盈 + 留底仓，让规则 AI 不会一有利润就全部离场。
+    // Tiered take-profit + keep base position, so Rule AI doesn't exit entirely on first profit.
     if (profitPct >= 0.07 && !mh.tookProfit1) {
         const sellShares = Math.max(1, Math.floor(mh.shares * 0.30));
         machineSell(symbol, sellShares);
@@ -1260,7 +1260,7 @@ function manageMachinePosition(symbol) {
 
 function executeMachinePortfolioTrading() {
     if (Date.now() < machineLossCooldownUntil) {
-        // 冷却期仍允许风控卖出，不允许新开仓。
+        // During cooldown, still allow risk-control sells, disallow new positions.
         for (const s of STOCKS) manageMachinePosition(s.symbol);
         return;
     }
@@ -1332,10 +1332,10 @@ function machineTradingForSymbol(symbol) {
     const st = stockState[symbol];
     if (st.priceData.length < 2) return;
 
-    // 连败冷却
+    // Losing streak cooldown
     if (Date.now() < machineLossCooldownUntil) return;
 
-    // 持仓管理
+    // Position management
     if (mh.shares > 0) {
         const avgCost = mh.totalInvested / mh.shares;
         const profitPct = (st.currentPrice - avgCost) / avgCost;
@@ -1353,7 +1353,7 @@ function machineTradingForSymbol(symbol) {
             machineSell(symbol, mh.shares);
             return;
         }
-        // 分级止盈
+        // Tiered take-profit
         if (profitPct >= 0.08 && !mh.tookProfit1) {
             const sellShares = Math.max(1, Math.floor(mh.shares / 3));
             machineSell(symbol, sellShares);
@@ -1379,17 +1379,17 @@ function machineTradingForSymbol(symbol) {
         return;
     }
 
-    // 资金管理
+    // Capital management
     const totalAsset = getMachineTotalAsset();
     if (totalAsset > machinePeakAsset) machinePeakAsset = totalAsset;
     const drawdown = machinePeakAsset > 0 ? (machinePeakAsset - totalAsset) / machinePeakAsset : 0;
     if (drawdown >= MAX_DRAWDOWN_THRESHOLD) return;
 
-    // 评估这只股票的买入信号
+    // Evaluate this stock's buy signal
     const sig = evaluateBuySignalForSymbol(symbol);
     if (!sig.canBuy) return;
 
-    // 计算仓位
+    // Calculate position size
     const recentVol = calculateRecentVolatility(st.priceData);
     if (recentVol > MAX_ENTRY_VOL) return;
     const edge = Math.min(1, sig.score / 10);
@@ -1401,7 +1401,7 @@ function machineTradingForSymbol(symbol) {
     const volTargetRatio = Math.min(0.5, VOL_TARGET_PER_STEP / Math.max(recentVol, 0.005));
     positionRatio = Math.min(positionRatio, volTargetRatio);
 
-    // 信号强度：评分越高越优先买；评分相同则波动率高的优先买（机会）
+    // Signal strength: higher score takes priority; same score, higher volatility takes priority (opportunity)
     const shares = Math.floor(machineCash * positionRatio / st.currentPrice);
     if (shares <= 0) return;
     machineBuy(symbol, shares);
@@ -1413,7 +1413,7 @@ function machineTradingForSymbol(symbol) {
 }
 
 // ====================================================================
-// ML 机器人：跨股票自由选择
+// ML Robot: free cross-stock selection
 // ====================================================================
 function selectAction(qTable, state, explorationRate) {
     if (Math.random() < explorationRate) {
@@ -1527,7 +1527,7 @@ function mlBuy(symbol, shares) {
     const timeLabel = now.getHours().toString().padStart(2, '0') + ':' +
                      now.getMinutes().toString().padStart(2, '0') + ':' +
                      now.getSeconds().toString().padStart(2, '0');
-    rh.txHistory.push({ time: timeLabel, timestamp: Date.now(), type: '买入', symbol, price: st.currentPrice, shares, amount: cost, fee });
+    rh.txHistory.push({ time: timeLabel, timestamp: Date.now(), type: 'Buy', symbol, price: st.currentPrice, shares, amount: cost, fee });
 }
 function mlSell(symbol, shares) {
     if (shares <= 0) return null;
@@ -1552,12 +1552,12 @@ function mlSell(symbol, shares) {
     const timeLabel = now.getHours().toString().padStart(2, '0') + ':' +
                      now.getMinutes().toString().padStart(2, '0') + ':' +
                      now.getSeconds().toString().padStart(2, '0');
-    rh.txHistory.push({ time: timeLabel, timestamp: Date.now(), type: '卖出', symbol, price: st.currentPrice, shares, amount: revenue, fee: sellFee });
+    rh.txHistory.push({ time: timeLabel, timestamp: Date.now(), type: 'Sell', symbol, price: st.currentPrice, shares, amount: revenue, fee: sellFee });
     if (rh.shares <= 0) {
         rh.shares = 0; rh.totalInvested = 0;
         rh.stopLossPrice = null; rh.takeProfitPrice = null; rh.trailingPeak = null; rh.lastBuyTime = null;
     }
-    // 更新 ML 机器人的盈亏统计
+    // Update ML Robot P&L statistics
     if (realizedPnL > 0) {
         mlRobotStats.winTrades++;
         mlRobotStats.grossProfit += realizedPnL;
@@ -1612,7 +1612,7 @@ async function executeMLRobotTrading() {
         const drawdown = mlRobotStats.assetPeak > 0 ? (mlRobotStats.assetPeak - beforeAsset) / mlRobotStats.assetPeak : 0;
         const actionBySymbol = {};
 
-        // 组合风控：所有持仓都先更新移动止损，必要时卖出。
+        // Portfolio risk control: update trailing stop for all positions, sell if necessary.
         for (const s of STOCKS) {
             const rh = mlRobotHoldings[s.symbol];
             const st = stockState[s.symbol];
@@ -1638,7 +1638,7 @@ async function executeMLRobotTrading() {
         const exploreProb = mlRobotStats.explorationRate;
         const actRandom = Math.random() < exploreProb;
 
-        // 卖出：不是只卖一只，所有高风险/高卖出分的持仓都可被部分或全部处理。
+        // Sell: not just one stock, all high-risk/high-sell-score positions can be partially or fully processed.
         const sellCandidates = contexts
             .filter(ctx => ctx.rh.shares > 0)
             .map(ctx => {
@@ -1660,7 +1660,7 @@ async function executeMLRobotTrading() {
             actionBySymbol[ctx.symbol] = 'sell';
         }
 
-        // 买入：允许每个决策周期买入多个候选，使学习 AI 能同时持有多只股票。
+        // Buy: allow buying multiple candidates per decision cycle, so learning AI can hold multiple stocks simultaneously.
         const afterSellAsset = getMLRobotTotalAsset();
         const openPositions = countOpenPositions(mlRobotHoldings);
         let availableSlots = Math.max(0, ML_MAX_POSITIONS - openPositions);
@@ -1715,7 +1715,7 @@ async function executeMLRobotTrading() {
             buys++;
         }
 
-        // 训练：使用本轮真实执行/持有动作，而不是随机动作，奖励基于组合净值和价格方向。
+        // Training: use actual executed/held actions this round, not random actions, reward based on portfolio value and price direction.
         const afterAsset = getMLRobotTotalAsset();
         recordMLPortfolioMetrics(afterAsset);
         let stepTotalReward = 0;
@@ -1771,14 +1771,14 @@ async function executeMLRobotTrading() {
             explorationRateDisplay.textContent = mlRobotStats.explorationRate.toFixed(2);
         }
     } catch (e) {
-        console.error('ML 错误:', e);
+        console.error('ML Error:', e);
     } finally {
         mlRobotStats.isProcessing = false;
     }
 }
 
 // ====================================================================
-// 持久化（每个股票一个 Q-table key）
+// Persistence (one Q-table key per stock)
 // ====================================================================
 function saveAllQTables() {
     saveQTablePending = true;
@@ -1855,7 +1855,7 @@ async function saveMLModel() {
         const response = await fetch(`${ML_API_URL}/api/ml/save`, { method: 'POST', headers: { 'Content-Type': 'application/json' } });
         if (response.ok) {
             const result = await response.json();
-            if (result.success) showToast('ML模型已自动保存', 'success', 2000);
+            if (result.success) showToast('ML model auto-saved', 'success', 2000);
         }
     } catch {}
 }
@@ -1895,16 +1895,16 @@ async function reloadLatestMLModel() {
         if (response.ok) {
             const result = await response.json();
             if (result.success) {
-                showToast(`ML 模型已重新加载 (${result.q_table_size} 状态)`, 'success', 2000);
+                showToast(`ML model reloaded (${result.q_table_size} states)`, 'success', 2000);
             }
         }
     } catch (error) {
-        console.warn('重新加载 ML 模型失败:', error);
+        console.warn('Failed to reload ML model:', error);
     }
 }
 
 // ====================================================================
-// 数据重置
+// Data Reset
 // ====================================================================
 function resetChartData() {
     globalMarketState.tick = 0;
@@ -1957,7 +1957,7 @@ function limitDataPoints() {
 }
 
 function resetMLModel() {
-    if (!confirm('确定要重置机器学习模型吗？')) return;
+    if (!confirm('Are you sure you want to reset the ML model?')) return;
     mlRobotCash = 100.00;
     for (const s of STOCKS) {
         const rh = mlRobotHoldings[s.symbol];
@@ -1984,11 +1984,11 @@ function resetMLModel() {
     if (accuracyChart) { accuracyChart.data.datasets[0].data = []; accuracyChart.update(); }
     if (sharpeChart) { sharpeChart.data.datasets[0].data = []; sharpeChart.update(); }
     localStorage.removeItem('ml_robot_qtable_multi');
-    showToast('机器学习模型已重置', 'info');
+    showToast('ML model reset', 'info');
 }
 
 function resetBacktest() {
-    if (!confirm('确定要重置回测统计吗？')) return;
+    if (!confirm('Are you sure you want to reset backtest statistics?')) return;
     mlRobotStats.startTime = Date.now();
     mlRobotStats.maxDrawdown = 0;
     mlRobotStats.maxDrawdownAsset = getMLRobotTotalAsset();
@@ -2001,16 +2001,16 @@ function resetBacktest() {
     mlRobotPortfolioSharpeHistory = [];
     lastMLPortfolioValue = getMLRobotTotalAsset();
     updateBacktestInfo();
-    showToast('回测统计已重置', 'info');
+    showToast('Backtest statistics reset', 'info');
 }
 
-// 预训练：在合成数据上快速预填 Q-table，让机器人一开始就具备一些先验知识
+// Pretraining: quickly pre-fill Q-table on synthetic data, giving the robot some prior knowledge from the start
 async function pretrainMLModel() {
     if (isPretraining) return;
     isPretraining = true;
     pretrainCancelRequested = false;
 
-    // 显示进度容器
+    // Show progress container
     if (pretrainProgressContainer) pretrainProgressContainer.classList.remove('hidden');
     const startBtn = document.getElementById('pretrainMLModelBtn');
     if (startBtn) { startBtn.disabled = true; startBtn.classList.add('opacity-50', 'cursor-not-allowed'); }
@@ -2019,11 +2019,11 @@ async function pretrainMLModel() {
     const totalEpisodes = parseInt(sizeSelect ? sizeSelect.value : '3000') || 3000;
     const episodesPerStock = Math.max(100, Math.floor(totalEpisodes / STOCKS.length));
 
-    if (pretrainStatus) pretrainStatus.textContent = '初始化...';
+    if (pretrainStatus) pretrainStatus.textContent = 'Initializing...';
     if (pretrainProgressBar) pretrainProgressBar.style.width = '0%';
     if (pretrainProgressPercent) pretrainProgressPercent.textContent = '0%';
 
-    // 临时给 Q-table 一些先验：使用合成价格序列
+    // Temporarily give Q-table some priors: use synthetic price sequences
     let correctTotal = 0, decisionTotal = 0;
     const lr = mlRobotStats.learningRate;
     const gamma = mlRobotStats.discountFactor;
@@ -2032,7 +2032,7 @@ async function pretrainMLModel() {
     try {
         for (let i = 0; i < episodesPerStock; i++) {
             if (pretrainCancelRequested) {
-                if (pretrainStatus) pretrainStatus.textContent = '已取消';
+                if (pretrainStatus) pretrainStatus.textContent = 'Cancelled';
                 break;
             }
 
@@ -2041,7 +2041,7 @@ async function pretrainMLModel() {
             const cfg = s;
             const rh = mlRobotHoldings[s.symbol];
 
-            // 生成一段合成价格序列（~ 30 个 tick）
+            // Generate a synthetic price sequence (~30 ticks)
             const seqLen = 30;
             const prices = [];
             let p = cfg.startPrice;
@@ -2052,7 +2052,7 @@ async function pretrainMLModel() {
                 prices.push(p);
             }
 
-            // 沿序列遍历并更新 Q-table
+            // Traverse the sequence and update Q-table
             for (let t = 1; t < seqLen; t++) {
                 const price = prices[t], prev = prices[t - 1];
                 const priceChange = (price - prev) / prev;
@@ -2061,9 +2061,9 @@ async function pretrainMLModel() {
                 const trendDir = t > 5 && prices[t] > prices[t - 5] ? 1 : -1;
                 const vola = 0.02;
                 const state = encodeSmartState(price, priceChange, rsi, macd, false, 0, 'neutral', 0, trendDir, { volatility: vola });
-                const nextState = state; // 单步无后继
+                const nextState = state; // Single step, no successor
 
-                // 评估三种行动并更新 Q
+                // Evaluate three actions and update Q
                 const actions = ['buy', 'sell', 'hold'];
                 for (const action of actions) {
                     let reward = 0;
@@ -2077,7 +2077,7 @@ async function pretrainMLModel() {
                         reward = future * 200;
                         correct = future > 0.002;
                     } else {
-                        // hold 在震荡中正确
+                        // hold is correct during range-bound
                         correct = Math.abs(priceChange) < 0.005;
                         reward = correct ? 1 : -1;
                     }
@@ -2091,17 +2091,17 @@ async function pretrainMLModel() {
                 const pct = Math.floor((i / episodesPerStock) * 100);
                 if (pretrainProgressBar) pretrainProgressBar.style.width = pct + '%';
                 if (pretrainProgressPercent) pretrainProgressPercent.textContent = pct + '%';
-                if (pretrainStatus) pretrainStatus.textContent = `训练中... ${i}/${episodesPerStock} 集 (${s.symbol})`;
+                if (pretrainStatus) pretrainStatus.textContent = `Training... ${i}/${episodesPerStock} episodes (${s.symbol})`;
                 if (pretrainAccuracy) pretrainAccuracy.textContent = decisionTotal > 0 ? (correctTotal / decisionTotal * 100).toFixed(2) + '%' : '0.00%';
-                // 让浏览器有机会刷新
+                // Give browser a chance to refresh
                 await new Promise(r => setTimeout(r, 0));
             }
         }
 
-        // 完成
+        // Complete
         if (pretrainProgressBar) pretrainProgressBar.style.width = '100%';
         if (pretrainProgressPercent) pretrainProgressPercent.textContent = '100%';
-        if (pretrainStatus) pretrainStatus.textContent = '预训练完成 ✓';
+        if (pretrainStatus) pretrainStatus.textContent = 'Pretraining complete ✓';
         const acc = decisionTotal > 0 ? (correctTotal / decisionTotal * 100).toFixed(2) : '0.00';
         if (pretrainAccuracy) pretrainAccuracy.textContent = acc + '%';
         if (pretrainQTableSize) {
@@ -2109,16 +2109,16 @@ async function pretrainMLModel() {
             for (const s of STOCKS) total += Object.keys(mlRobotHoldings[s.symbol].qTable).length;
             pretrainQTableSize.textContent = total.toString();
         }
-        // 立刻保存
+        // Save immediately
         flushSaveQTable();
-        showToast(`预训练完成 ✓ (${episodesPerStock} 集 × ${STOCKS.length} 股)`, 'success', 3500);
+        showToast(`Pretraining complete ✓ (${episodesPerStock} episodes × ${STOCKS.length} stocks)`, 'success', 3500);
     } catch (e) {
-        if (pretrainStatus) pretrainStatus.textContent = '预训练失败: ' + e.message;
+        if (pretrainStatus) pretrainStatus.textContent = 'Pretraining failed: ' + e.message;
         console.error('pretrain error:', e);
     } finally {
         isPretraining = false;
         if (startBtn) { startBtn.disabled = false; startBtn.classList.remove('opacity-50', 'cursor-not-allowed'); }
-        // 3s 后折叠进度条
+        // Collapse progress bar after 3s
         setTimeout(() => {
             if (!isPretraining && pretrainProgressContainer) pretrainProgressContainer.classList.add('hidden');
         }, 3000);
@@ -2148,7 +2148,7 @@ function setCurrentStock(symbol) {
     const cfg = getCurrentStockCfg();
     if (currentStockNameEl) currentStockNameEl.textContent = cfg.name + ' (' + cfg.symbol + ')';
     if (currentStockSectorEl) currentStockSectorEl.textContent = cfg.sector + ' · ' + cfg.description;
-    // 更新股票卡片高亮
+    // Update stock card highlight
     if (stockCardsEl) {
         stockCardsEl.querySelectorAll('[data-symbol]').forEach(el => {
             if (el.dataset.symbol === symbol) {
@@ -2158,7 +2158,7 @@ function setCurrentStock(symbol) {
             }
         });
     }
-    // 更新图表标题
+    // Update chart title
     const chartStockNameEl = document.getElementById('chartStockName');
     if (chartStockNameEl) chartStockNameEl.textContent = cfg.symbol + ' ' + cfg.name;
     updateAssetDisplay();
@@ -2167,7 +2167,7 @@ function setCurrentStock(symbol) {
     updateMultiStockOverview();
 }
 
-// 多股票总览表
+// Multi-stock overview table
 function updateMultiStockOverview() {
     const tbody = document.getElementById('multiStockOverview');
     if (!tbody) return;
@@ -2177,27 +2177,27 @@ function updateMultiStockOverview() {
         const uh = userHoldings[s.symbol];
         const rh = mlRobotHoldings[s.symbol];
         if (st.priceData.length === 0) {
-            html += `<tr><td colspan="7" class="px-2 py-2 text-gray-400">${s.symbol} ${s.name} 等待数据...</td></tr>`;
+            html += `<tr><td colspan="7" class="px-2 py-2 text-gray-400">${s.symbol} ${s.name} Waiting for data...</td></tr>`;
             continue;
         }
         const last = st.priceData[st.priceData.length - 1];
         const prev = st.priceData.length >= 2 ? st.priceData[st.priceData.length - 2] : last;
         const change = last - prev;
         const changePct = prev > 0 ? (change / prev) * 100 : 0;
-        const color = change >= 0 ? 'text-red-600' : 'text-green-600';  // A股风格：红涨绿跌
+        const color = change >= 0 ? 'text-red-600' : 'text-green-600';  // A-share style: red up, green down
         const rsi = st.rsiData[st.rsiData.length - 1];
         const rsiTxt = rsi === null || rsi === undefined ? '--' : rsi.toFixed(0);
         const ma5 = st.ma5Data[st.ma5Data.length - 1];
         const ma10 = st.ma10Data[st.ma10Data.length - 1];
-        let trendTxt = '震荡';
+        let trendTxt = 'Range-bound';
         let trendColor = 'text-gray-500';
         if (ma5 && ma10) {
-            if (ma5 > ma10 * 1.002) { trendTxt = '↑ 上升'; trendColor = 'text-red-600'; }
-            else if (ma5 < ma10 * 0.998) { trendTxt = '↓ 下降'; trendColor = 'text-green-600'; }
+            if (ma5 > ma10 * 1.002) { trendTxt = '↑ Rising'; trendColor = 'text-red-600'; }
+            else if (ma5 < ma10 * 0.998) { trendTxt = '↓ Falling'; trendColor = 'text-green-600'; }
         }
         const isActive = s.symbol === currentSymbol;
         const rowClass = isActive ? 'bg-blue-50 font-medium' : 'hover:bg-gray-50';
-        const aiHasShares = rh.shares > 0 ? `持有 ${rh.shares}股` : (rh.qTable && Object.keys(rh.qTable).length > 0 ? '学习中' : '观察中');
+        const aiHasShares = rh.shares > 0 ? `Holding ${rh.shares} shares` : (rh.qTable && Object.keys(rh.qTable).length > 0 ? 'Learning' : 'Observing');
         html += `
             <tr class="${rowClass} cursor-pointer" data-symbol="${s.symbol}">
                 <td class="px-2 py-2">
@@ -2214,7 +2214,7 @@ function updateMultiStockOverview() {
             </tr>`;
     }
     tbody.innerHTML = html;
-    // 点击行切换股票
+    // Click row to switch stock
     tbody.querySelectorAll('[data-symbol]').forEach(el => {
         el.addEventListener('click', () => setCurrentStock(el.dataset.symbol));
     });
@@ -2256,12 +2256,12 @@ function buildStockCards() {
 }
 
 // ====================================================================
-// 初始化
+// Initialization
 // ====================================================================
 function initialize() {
     initStockStates();
 
-    // DOM 元素
+    // DOM elements
     startBtn = document.getElementById('startBtn');
     cashDisplay = document.getElementById('cashDisplay');
     totalAssetDisplay = document.getElementById('totalAssetDisplay');
@@ -2329,7 +2329,7 @@ function initialize() {
     backtestSessionDuration = document.getElementById('backtestSessionDuration');
     resetBacktestBtn = document.getElementById('resetBacktestBtn');
 
-    // 预训练 DOM 绑定
+    // Pretraining DOM bindings
     pretrainProgressContainer = document.getElementById('pretrainProgressContainer');
     pretrainProgressBar = document.getElementById('pretrainProgressBar');
     pretrainProgressPercent = document.getElementById('pretrainProgressPercent');
@@ -2440,7 +2440,7 @@ function initializeCharts() {
         data: {
             labels: [],
             datasets: [
-                { label: '价格', data: [], borderColor: '#1a56db', backgroundColor: 'rgba(26, 86, 219, 0.1)', borderWidth: 2, fill: true, tension: 0.4, pointRadius: 0, pointHoverRadius: 4 },
+                { label: 'Price', data: [], borderColor: '#1a56db', backgroundColor: 'rgba(26, 86, 219, 0.1)', borderWidth: 2, fill: true, tension: 0.4, pointRadius: 0, pointHoverRadius: 4 },
                 { label: 'MA5', data: [], borderColor: '#10b981', borderWidth: 1.5, fill: false, tension: 0.4, pointRadius: 0, hidden: false },
                 { label: 'MA10', data: [], borderColor: '#f59e0b', borderWidth: 1.5, fill: false, tension: 0.4, pointRadius: 0, hidden: false }
             ]
@@ -2471,8 +2471,8 @@ function initializeCharts() {
             labels: [],
             datasets: [
                 { label: 'RSI', data: [], borderColor: '#ef4444', backgroundColor: 'rgba(239, 68, 68, 0.1)', borderWidth: 2, fill: true, tension: 0.4, pointRadius: 0 },
-                { label: '超买线', data: Array(30).fill(70), borderColor: 'rgba(239, 68, 68, 0.5)', borderWidth: 1, borderDash: [5, 5], fill: false, pointRadius: 0 },
-                { label: '超卖线', data: Array(30).fill(30), borderColor: 'rgba(16, 185, 129, 0.5)', borderWidth: 1, borderDash: [5, 5], fill: false, pointRadius: 0 }
+                { label: 'Overbought', data: Array(30).fill(70), borderColor: 'rgba(239, 68, 68, 0.5)', borderWidth: 1, borderDash: [5, 5], fill: false, pointRadius: 0 },
+                { label: 'Oversold', data: Array(30).fill(30), borderColor: 'rgba(16, 185, 129, 0.5)', borderWidth: 1, borderDash: [5, 5], fill: false, pointRadius: 0 }
             ]
         },
         options: {
@@ -2522,16 +2522,16 @@ function initializeCharts() {
         data: {
             labels: [],
             datasets: [
-                { label: '您的资产', data: [], borderColor: '#1a56db', backgroundColor: 'rgba(26, 86, 219, 0.1)', borderWidth: 2, fill: true, tension: 0.4, pointRadius: 0 },
-                { label: '规则AI资产', data: [], borderColor: '#3b82f6', backgroundColor: 'rgba(59, 130, 246, 0.1)', borderWidth: 2, fill: true, tension: 0.4, pointRadius: 0, hidden: false },
-                { label: '学习AI资产', data: [], borderColor: '#9333ea', backgroundColor: 'rgba(147, 51, 234, 0.1)', borderWidth: 2, fill: true, tension: 0.4, pointRadius: 0, hidden: false }
+                { label: 'Your Assets', data: [], borderColor: '#1a56db', backgroundColor: 'rgba(26, 86, 219, 0.1)', borderWidth: 2, fill: true, tension: 0.4, pointRadius: 0 },
+                { label: 'Rule AI Assets', data: [], borderColor: '#3b82f6', backgroundColor: 'rgba(59, 130, 246, 0.1)', borderWidth: 2, fill: true, tension: 0.4, pointRadius: 0, hidden: false },
+                { label: 'Learning AI Assets', data: [], borderColor: '#9333ea', backgroundColor: 'rgba(147, 51, 234, 0.1)', borderWidth: 2, fill: true, tension: 0.4, pointRadius: 0, hidden: false }
             ]
         },
         options: {
             responsive: true, maintainAspectRatio: false,
             plugins: {
                 legend: { display: false },
-                tooltip: { enabled: true, backgroundColor: 'rgba(255, 255, 255, 0.9)', titleColor: '#1e293b', bodyColor: '#1e293b', borderColor: '#e2e8f0', borderWidth: 1, padding: 10, callbacks: { label: function(context) { return '总资产: ¥' + context.parsed.y.toFixed(2); } } }
+                tooltip: { enabled: true, backgroundColor: 'rgba(255, 255, 255, 0.9)', titleColor: '#1e293b', bodyColor: '#1e293b', borderColor: '#e2e8f0', borderWidth: 1, padding: 10, callbacks: { label: function(context) { return 'Total Assets: ¥' + context.parsed.y.toFixed(2); } } }
             },
             scales: {
                 x: { grid: { display: false }, ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 8 } },
@@ -2547,7 +2547,7 @@ function initializeMLCharts() {
     const rewardCtx = document.getElementById('rewardChart').getContext('2d');
     rewardChart = new Chart(rewardCtx, {
         type: 'line',
-        data: { labels: [], datasets: [{ label: '累计奖励', data: [], borderColor: '#9333ea', backgroundColor: 'rgba(147, 51, 234, 0.1)', borderWidth: 2, fill: true, tension: 0.4, pointRadius: 0 }] },
+        data: { labels: [], datasets: [{ label: 'Cumulative Reward', data: [], borderColor: '#9333ea', backgroundColor: 'rgba(147, 51, 234, 0.1)', borderWidth: 2, fill: true, tension: 0.4, pointRadius: 0 }] },
         options: {
             responsive: true, maintainAspectRatio: false,
             plugins: { legend: { display: false }, tooltip: { enabled: true, backgroundColor: 'rgba(255, 255, 255, 0.9)', titleColor: '#1e293b', bodyColor: '#1e293b', borderColor: '#e2e8f0', borderWidth: 1, padding: 10 } },
@@ -2559,10 +2559,10 @@ function initializeMLCharts() {
     const accuracyCtx = document.getElementById('accuracyChart').getContext('2d');
     accuracyChart = new Chart(accuracyCtx, {
         type: 'line',
-        data: { labels: [], datasets: [{ label: '决策准确率', data: [], borderColor: '#9333ea', backgroundColor: 'rgba(147, 51, 234, 0.1)', borderWidth: 2, fill: true, tension: 0.4, pointRadius: 0 }] },
+        data: { labels: [], datasets: [{ label: 'Decision Accuracy', data: [], borderColor: '#9333ea', backgroundColor: 'rgba(147, 51, 234, 0.1)', borderWidth: 2, fill: true, tension: 0.4, pointRadius: 0 }] },
         options: {
             responsive: true, maintainAspectRatio: false,
-            plugins: { legend: { display: false }, tooltip: { enabled: true, backgroundColor: 'rgba(255, 255, 255, 0.9)', titleColor: '#1e293b', bodyColor: '#1e293b', borderColor: '#e2e8f0', borderWidth: 1, padding: 10, callbacks: { label: function(context) { return '准确率: ' + context.parsed.y.toFixed(2) + '%'; } } } },
+            plugins: { legend: { display: false }, tooltip: { enabled: true, backgroundColor: 'rgba(255, 255, 255, 0.9)', titleColor: '#1e293b', bodyColor: '#1e293b', borderColor: '#e2e8f0', borderWidth: 1, padding: 10, callbacks: { label: function(context) { return 'Accuracy: ' + context.parsed.y.toFixed(2) + '%'; } } } },
             scales: { x: { grid: { display: false }, ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 6 } }, y: { position: 'right', grid: { color: 'rgba(0, 0, 0, 0.05)' }, min: 0, max: 100, ticks: { callback: function(value) { return value + '%'; } } } },
             animation: { duration: 0 }
         }
@@ -2571,10 +2571,10 @@ function initializeMLCharts() {
     const sharpeCtx = document.getElementById('sharpeChart').getContext('2d');
     sharpeChart = new Chart(sharpeCtx, {
         type: 'line',
-        data: { labels: [], datasets: [{ label: '夏普比率', data: [], borderColor: '#10b981', backgroundColor: 'rgba(16, 185, 129, 0.1)', borderWidth: 2, fill: true, tension: 0.4, pointRadius: 0 }] },
+        data: { labels: [], datasets: [{ label: 'Sharpe Ratio', data: [], borderColor: '#10b981', backgroundColor: 'rgba(16, 185, 129, 0.1)', borderWidth: 2, fill: true, tension: 0.4, pointRadius: 0 }] },
         options: {
             responsive: true, maintainAspectRatio: false,
-            plugins: { legend: { display: false }, tooltip: { enabled: true, backgroundColor: 'rgba(255, 255, 255, 0.9)', titleColor: '#1e293b', bodyColor: '#1e293b', borderColor: '#e2e8f0', borderWidth: 1, padding: 10, callbacks: { label: function(context) { return '夏普: ' + context.parsed.y.toFixed(2); } } } },
+            plugins: { legend: { display: false }, tooltip: { enabled: true, backgroundColor: 'rgba(255, 255, 255, 0.9)', titleColor: '#1e293b', bodyColor: '#1e293b', borderColor: '#e2e8f0', borderWidth: 1, padding: 10, callbacks: { label: function(context) { return 'Sharpe: ' + context.parsed.y.toFixed(2); } } } },
             scales: { x: { grid: { display: false }, ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 6 } }, y: { position: 'right', grid: { color: 'rgba(0, 0, 0, 0.05)' }, ticks: { callback: function(value) { return value.toFixed(2); } } } },
             animation: { duration: 0 }
         }

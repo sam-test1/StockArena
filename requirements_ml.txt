@@ -1,6 +1,6 @@
-# ML Trading Bot Backend 依赖
-# 注意: 当前后端 (ml_trading_api.py) 使用纯Python标准库实现，无需任何第三方依赖
-# 以下依赖适用于扩展版本（如果需要使用NumPy/Pandas替代纯Python计算）
+# ML Trading Bot Backend dependencies
+# Note: The current backend (ml_trading_api.py) is implemented using only the Python standard library with no third-party dependencies
+# The following dependencies are for the extended version (if using NumPy/Pandas as a replacement for pure Python computation)
 # numpy>=1.20.0
 # pandas>=1.3.0
 # flask>=2.0.0
